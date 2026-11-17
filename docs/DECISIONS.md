@@ -54,3 +54,27 @@ Format: tanggal, masalah, keputusan, alasan. Semua tanggal 2026-11-17 (Fase 1).
 
 ## D14. Berkas hasil generasi
 - Keputusan: `*.g.dart` tidak di-commit (ditambahkan ke `.gitignore`); `make verify` dan CI selalu menjalankan build_runner sebelum analyze. Alasan: mencegah drift antara sumber dan hasil generasi.
+
+## D15. Fase 2: konvensi geometri dan masukan (2026-11-17)
+- Konvensi piksel: piksel (i,j) berpusat pada (i,j) (sesuai D4); pusat citra `((w-1)/2, (h-1)/2)`. Renderer sintetis memakai konvensi yang sama.
+- Deteksi: id penanda di luar empat id lembar diabaikan (tidak dihitung); id ganda, sudut bukan 4, atau koordinat tak hingga memunculkan `InvalidDetectionException`; < 3 penanda valid memunculkan `TooFewMarkersException`.
+- Degenerate (`DegenerateConfigurationException`): titik segaris (rasio nilai eigen kovarians < 1e-6, yaitu sebaran melintang < 0,1 persen sebaran sepanjang garis), titik berimpit, rank DLT kurang, kedalaman tak konsisten, titik di garis tak hingga, dan penugasan tercermin (`det H < 0`, mis. urutan sudut terbalik). Alasan penambahan cermin: tanpa itu urutan sudut salah diterima diam-diam.
+- `rms_px` = akar rata-rata kuadrat jarak Euklides reproyeksi semua titik. `loo_mm` = RMS jarak Euklides 16 sudut (4 putaran x 4 sudut) dalam mm di lembar. Skala lokal: `mm_per_px` = rata-rata geometrik dua nilai singular Jacobian `H_inv` (`sqrt|det J|`), anisotropi = rasio nilai singular terbesar/terkecil; Jacobian beda-pusat langkah 0,5 px, di titik ukur (default pusat jendela).
+- `f_px` dari metadata = `focal_mm / sensor_sisi_panjang_mm * sisi_terpanjang_px` (independen potret/lanskap); metadata tak valid jatuh ke `0,75 x sisi_terpanjang`. `tilt_is_approx` selalu `true` (intrinsik tak pernah dikalibrasi).
+
+## D16. Fase 2: panduan pose dan gerbang kualitas
+- Instruksi dinyatakan sebagai tindakan pada ponsel: lembar tampak di kanan referensi -> `MOVE_RIGHT`; lembar lebih besar (ponsel terlalu dekat) -> `FARTHER`; lembar berputar searah jarum jam -> `ROTATE_CW`. Hanya sumbu translasi dominan yang dilaporkan sekali waktu. Urutan prioritas: `HOLD_FLAT`, skala, rotasi, translasi. Nilai tepat pada ambang masih "siap".
+- "Selisih tilt" = `|tilt_sekarang - tilt_referensi|` (skalar), sesuai 5.2 secara harfiah. Akibatnya arah kemiringan tidak dibedakan.
+- Tilt 20 sampai 30 derajat: ditolak (`TILT_TOO_HIGH`); > 30: `TILT_HARD_REJECT`. Keduanya menolak frame; bedanya hanya pesan UI. Dua faktor tambahan: `mm_per_px` 0,10 sampai 0,20 diterima dengan peringatan, 3 penanda diterima dengan peringatan.
+- `QualityThresholds` juga memuat ambang berbasis citra (`maxSigmaPx`, `maxBlurAnisotropy`, `maxSaturatedFraction`) untuk dipakai fase berikutnya; evaluasi geometri tidak memakainya.
+
+## D17. Fase 2: sensitivitas tilt terhadap `f_px` (SINTETIS, terukur, seed tetap)
+- Tanpa derau, rata-rata atas 12 azimut, roll 15 derajat, tilt benar -> estimasi pada `f x0,8` / `f x1,2` (galat maks): 0 -> 0,00 / 0,00; 10 -> 8,03 / 11,95 (1,97); 20 -> 16,23 / 23,59 (3,77); 30 -> 24,79 / 34,72 (5,21) derajat.
+- Kesimpulan: galat `f_px` 20 persen menggeser tilt sekitar 0,2 x tilt (f terlalu kecil menaksir rendah, terlalu besar menaksir tinggi). Dengan `f_px` tepat dan derau sudut 0,2 px, galat tilt hanya 0,012 sampai 0,019 derajat RMS: galat `f_px` mendominasi. Akibat untuk gerbang: frame 20 derajat sebenarnya dapat terbaca 16 sampai 24 derajat, jadi ambang tilt 20/30 derajat tidak tegas sampai `f_px` divalidasi (butuh pelat/ponsel nyata). `u_par` (5.5) memakai tilt ini, sehingga ketidakpastiannya ikut meleset.
+
+## D18. Fase 2: harness sintetis dan alat ukur
+- Harness ada di `package:hairline_core/synthetic.dart` (tidak diekspor oleh `hairline_core.dart`). Renderer: sampel sub-piksel SxS, PSF Gaussian pada resolusi sub-piksel (tepi direplikasi), integrasi kotak per piksel, gradien iluminasi perkalian, derau Gaussian, klip, kuantisasi 8 bit. Penanda dirender sebagai persegi padat (pola bit tidak diperlukan untuk uji tepi dan PSF). Retak = himpunan titik berjarak <= w/2 dari garis tengah (busur lingkaran bila melengkung), sehingga lebar tepat di sepanjang retak.
+- Validasi renderer: integral kegelapan tegak lurus retak sama dengan `kedalaman x lebar` untuk PSF apa pun; galat kuadratur tiap tepi <= 0,5/S px, jadi batas uji `1/S` px (S=8, dan S=4 bila PSF aktif).
+- Dependensi dev `coverage ^1.16.0` ditambahkan hanya untuk mengukur cakupan (`dart run coverage:format_coverage`); tidak masuk kode produksi.
+- Tata letak lembar untuk Fase 3 yang dipilih di sini: batang skala berpusat y = 90 mm (di bawah tepi bawah penanda pada y = 75 mm). Rentang pembacaan penggaris yang diterima 80 sampai 120 mm (di luar itu `PrintScaleException`: biasanya salah satuan atau salah ukur).
+- Pembangkit kamera acak: `f` 0,7..0,9 sisi panjang, 0,09..0,15 mm/px di pusat, tilt 0..25 derajat, roll +-20, offset pusat lembar +-10 mm. Rentang ini dipilih agar seluruh bingkai 150 mm selalu berada di dalam citra 4000x3000 (diuji pada 200 kamera).
