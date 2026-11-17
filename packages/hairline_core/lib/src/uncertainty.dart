@@ -68,6 +68,20 @@ final class FrameRecord {
   /// `u_fit = sqrt(rho Var(w))` (mm).
   double get uFitMm => sqrt(rho) * uFitRawMm;
 
+  /// Same frame with another status (the pipeline demotes a MODEL_MISFIT frame).
+  FrameRecord withStatus(MeasureStatus newStatus) => FrameRecord(
+        status: newStatus,
+        widthMm: widthMm,
+        uFitRawMm: uFitRawMm,
+        rho: rho,
+        uSigmaWMm: uSigmaWMm,
+        dwDs: dwDs,
+        mmPerPx: mmPerPx,
+        rmsPx: rmsPx,
+        looMm: looMm,
+        tiltDeg: tiltDeg,
+      );
+
   /// Same frame with another variance inflation factor.
   FrameRecord withRho(double newRho) => FrameRecord(
         status: status,

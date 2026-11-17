@@ -20,3 +20,16 @@ jobs:
           channel: stable
       - run: cd app && flutter pub get && dart run build_runner build
       - run: cd app && flutter analyze && flutter test
+
+  # NOT YET PROVEN (BLOCKERS B1): the native OpenCV build was never run successfully; this job is
+  # the first attempt on Linux. Until it is green the adapter tests count as "written, not run".
+  opencv:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - run: cd packages/hairline_opencv && flutter pub get && flutter analyze && flutter test

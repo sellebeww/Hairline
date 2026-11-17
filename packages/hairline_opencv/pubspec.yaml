@@ -1,0 +1,31 @@
+name: hairline_opencv
+description: OpenCV adapters for Hairline (JPEG decode, ROI patches, ArUco detection). No measurement logic.
+publish_to: none
+# Copyright (c) 2026 Vassel Goleyu. MIT License.
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.38.1"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  hairline_core:
+    path: ../hairline_core
+  opencv_dart: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+# Modules compiled into libdartcv (D10). `aruco` needs objdetect and calib3d.
+hooks:
+  user_defines:
+    dartcv4:
+      include_modules:
+        - imgproc
+        - imgcodecs
+        - calib3d
+        - objdetect
+        - aruco

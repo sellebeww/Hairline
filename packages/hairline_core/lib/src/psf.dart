@@ -191,8 +191,20 @@ PsfEstimate estimatePsf({
 }) {
   final ids = markerIdsForSheet(sheetId);
   final use = markerIds == null ? ids : [for (final id in ids) if (markerIds.contains(id)) id];
+  return estimatePsfFromPatches(patches: {for (final id in use) id: patch}, h: h, printScale: printScale);
+}
+
+/// Same as [estimatePsf] with one small patch per marker (keyed by marker id) instead
+/// of one patch that spans the whole frame: a 12 MP photo then needs four patches of
+/// about 0.3 Mpx rather than one of several Mpx. Each patch only has to cover the two
+/// outer edges of its marker (about 10 px beyond them).
+PsfEstimate estimatePsfFromPatches({
+  required Map<int, GrayPatch> patches,
+  required Mat3 h,
+  double printScale = 1,
+}) {
   final edges = <EdgeSigma>[];
-  for (final id in use) {
+  for (final MapEntry(key: id, value: patch) in patches.entries) {
     final c = markerCenterMm(id, printScale: printScale);
     final hs = markerSideMm / 2 * printScale;
     final pos = markerPositionOfId(id);

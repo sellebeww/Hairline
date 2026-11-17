@@ -469,3 +469,18 @@ dart run tool/measurement_sweep.dart subpixel coverage timing   # bagian tertent
 ```
 
 Bagian: `ideal subpixel blur noise tilt illum geometry violations violations2 psfmismatch misfit align coverage timing`.
+
+## Fase 5: rantai ujung-ke-ujung dengan JPEG nyata (SINTETIS, seed tetap)
+
+Sumber: `packages/hairline_core/test/frame_pipeline_test.dart`, `dart test` (dijalankan 2026-11-17). Foto 1600 x 1500, 0,12 mm/px, tilt 8 derajat, roll 12, lembar 0, retak 0,6 mm (5 px) arah 25 derajat, sigma 1 px, derau 0,004 (cahaya linear), derau sudut 0,2 px, burst 4 frame (derau berbeda per frame, seed 7). Pipeline: render linear -> sRGB 8 bit -> (JPEG, paket `image` 4.13.1, pengaturan bawaan) -> dekode ke abu-abu -> `processFrame` (linearisasi, patch per penanda, PSF, `measureFrame`) -> `aggregateVisit`. Detektor penanda adalah sudut yang diproyeksikan ditambah derau (OpenCV tidak berjalan di host ini), jadi tes ini TIDAK menguji deteksi sub-pixel pada citra terkompresi.
+
+| Masukan | Lebar (um) | Galat (um) | U (um) | u_c (um) |
+|---|---|---|---|---|
+| mentah (tanpa JPEG) | 599,2 | -0,8 | 128,7 | 65,6 |
+| JPEG kualitas 95 | 599,5 | -0,5 | 128,7 | 65,6 |
+| JPEG kualitas 85 | 599,7 | -0,3 | 128,7 | 65,7 |
+
+- Pergeseran akibat JPEG terhadap mentah: +0,2 um (q95), +0,5 um (q85), atau sekitar 0,1 sampai 0,4 persen dari `U`. Lebar terukur berada di dalam `U` yang dilaporkan di ketiga kasus (ditegakkan di tes; batas pergeseran 5 um dan `U/10`).
+- Batas penafsiran: satu seed, satu geometri, citra abu-abu yang disandikan sebagai RGB; codec `image` bukan libjpeg ponsel dan tidak ada penajaman ISP, pengurangan derau, atau subsampling krominans yang berarti. Angka ini membuktikan bahwa kuantisasi DCT (q85 dan q95) sendiri bukan masalah pada lebar 5 px, BUKAN bahwa foto ponsel nyata akan sama. Anggaran 5.5 tidak punya suku JPEG; validasi `PERANGKAT` (Fase 7) yang akan menangkapnya lewat `u_dev`.
+- `U` hampir seluruhnya `u_dev` bawaan 0,5 mm/px (D29), sebab itu 128,7 um jauh di atas galat nyata (sekitar 1 um).
+- Memori (terukur sebagai luas, bukan byte): empat patch penanda masing-masing sekitar 4 sampai 5 persen luas foto, total di bawah 25 persen; tidak ada patch seluruh lembar. Pada foto 12 MP dengan lembar memenuhi bingkai (sekitar 0,05 mm/px) ekstrapolasi kasar dari rasio itu memberi sekitar 2 Mpx Float32 (8 MB) plus salinan linear (8 MB), bukan sekitar 46 MB per salinan untuk satu patch seluruh lembar. Ekstrapolasi ini belum diukur di ponsel.

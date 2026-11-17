@@ -83,15 +83,24 @@ final class FrameGeometry {
 /// Reasons a frame is rejected. UI maps [code] to a specific Indonesian message
 /// ("penanda tertutup", "terlalu miring", ...).
 enum FrameRejection {
-  tooFewMarkers('TOO_FEW_MARKERS'),
-  rmsTooHigh('RMS_TOO_HIGH'),
-  looTooHigh('LOO_TOO_HIGH'),
-  tiltTooHigh('TILT_TOO_HIGH'),
-  tiltHardReject('TILT_HARD_REJECT'),
-  resolutionTooCoarse('RESOLUTION_TOO_COARSE');
+  tooFewMarkers('TOO_FEW_MARKERS', 'Penanda tertutup atau tidak terlihat. Pastikan minimal tiga penanda terlihat utuh.'),
+  rmsTooHigh('RMS_TOO_HIGH', 'Posisi penanda tidak konsisten (lembar bergelombang atau foto terdistorsi). Ratakan lembar dan ulangi.'),
+  looTooHigh('LOO_TOO_HIGH', 'Satu penanda tidak sebidang dengan yang lain. Pastikan lembar menempel rata.'),
+  tiltTooHigh('TILT_TOO_HIGH', 'Ponsel terlalu miring terhadap lembar. Arahkan kamera tegak lurus.'),
+  tiltHardReject('TILT_HARD_REJECT', 'Ponsel sangat miring terhadap lembar. Arahkan kamera tegak lurus.'),
+  resolutionTooCoarse('RESOLUTION_TOO_COARSE', 'Terlalu jauh dari lembar. Dekatkan ponsel agar lembar memenuhi bingkai.'),
 
-  const FrameRejection(this.code);
+  /// The homography could not be estimated (degenerate or inconsistent detections).
+  homographyFailed('HOMOGRAPHY_FAILED', 'Posisi penanda tidak dapat dihitung. Ulangi pemotretan.'),
+
+  /// The photo could not be decoded.
+  imageUnreadable('IMAGE_UNREADABLE', 'Foto tidak dapat dibaca. Ulangi pemotretan.');
+
+  const FrameRejection(this.code, this.message);
   final String code;
+
+  /// Specific message for the user (Indonesian).
+  final String message;
 }
 
 /// Non-blocking remarks on an accepted frame.
