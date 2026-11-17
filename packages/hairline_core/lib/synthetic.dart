@@ -7,4 +7,6 @@ library;
 export 'src/synthetic/camera.dart';
 export 'src/synthetic/detector.dart';
 export 'src/synthetic/noise.dart';
+export 'src/synthetic/patch_scene.dart';
 export 'src/synthetic/render.dart';
+export 'src/synthetic/violations.dart';

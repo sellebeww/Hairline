@@ -48,7 +48,8 @@ PixelToScene pixelToSceneLinear({required double mmPerPx, Pt centerPx = const Pt
 /// sub-pixel resolution with replicated borders; integrate over each pixel (box
 /// average, i.e. anti-aliasing); multiply by a linear illumination gradient
 /// (relative change across the image, [illumGradX], [illumGradY]: 0.2 means +-10
-/// percent); add Gaussian noise of [noiseSigma] (intensity units); clip to 0..1;
+/// percent); [psfSigmaYPx] (default: same as [psfSigmaPx]) makes the blur anisotropic
+/// along the image axes; add Gaussian noise of [noiseSigma] (intensity units); clip to 0..1;
 /// quantise to 8 bits. No OpenCV.
 GrayImage renderGray({
   required int width,
@@ -57,6 +58,7 @@ GrayImage renderGray({
   required Scene scene,
   int supersample = 4,
   double psfSigmaPx = 0,
+  double? psfSigmaYPx,
   double illumGradX = 0,
   double illumGradY = 0,
   double noiseSigma = 0,
@@ -73,7 +75,9 @@ GrayImage renderGray({
       hi[j * w + i] = scene(p.x, p.y);
     }
   }
-  if (psfSigmaPx > 0) hi = _blur(hi, w, h, psfSigmaPx * s);
+  if (psfSigmaPx > 0 || (psfSigmaYPx ?? 0) > 0) {
+    hi = _blur(hi, w, h, psfSigmaPx * s, (psfSigmaYPx ?? psfSigmaPx) * s);
+  }
 
   final noise = noiseSigma > 0 ? (rng ?? Random(0)) : null;
   final out = Float32List(width * height);
@@ -98,20 +102,27 @@ GrayImage renderGray({
   return GrayImage(width, height, out);
 }
 
-/// Separable Gaussian blur, kernel radius 4 sigma, replicated borders.
-Float64List _blur(Float64List src, int w, int h, double sigma) {
+/// Gaussian kernel of std dev [sigma] (samples), radius 4 sigma, normalised; a
+/// single tap when [sigma] is 0.
+List<double> _kernel(double sigma) {
+  if (sigma <= 0) return [1.0];
   final r = (4 * sigma).ceil();
   final k = [for (var i = -r; i <= r; i++) exp(-i * i / (2 * sigma * sigma))];
   final norm = k.reduce((a, b) => a + b);
-  for (var i = 0; i < k.length; i++) {
-    k[i] /= norm;
-  }
+  return [for (final v in k) v / norm];
+}
+
+/// Separable Gaussian blur, std devs [sx] (along x) and [sy] (along y), replicated
+/// borders.
+Float64List _blur(Float64List src, int w, int h, double sx, double sy) {
+  final kx = _kernel(sx), ky = _kernel(sy);
+  final rx = kx.length ~/ 2, ry = ky.length ~/ 2;
   final tmp = Float64List(w * h);
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
       var acc = 0.0;
-      for (var t = -r; t <= r; t++) {
-        acc += k[t + r] * src[y * w + (x + t).clamp(0, w - 1)];
+      for (var t = -rx; t <= rx; t++) {
+        acc += kx[t + rx] * src[y * w + (x + t).clamp(0, w - 1)];
       }
       tmp[y * w + x] = acc;
     }
@@ -120,8 +131,8 @@ Float64List _blur(Float64List src, int w, int h, double sigma) {
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
       var acc = 0.0;
-      for (var t = -r; t <= r; t++) {
-        acc += k[t + r] * tmp[(y + t).clamp(0, h - 1) * w + x];
+      for (var t = -ry; t <= ry; t++) {
+        acc += ky[t + ry] * tmp[(y + t).clamp(0, h - 1) * w + x];
       }
       out[y * w + x] = acc;
     }

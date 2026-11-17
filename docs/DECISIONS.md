@@ -78,3 +78,47 @@ Format: tanggal, masalah, keputusan, alasan. Semua tanggal 2026-11-17 (Fase 1).
 - Dependensi dev `coverage ^1.16.0` ditambahkan hanya untuk mengukur cakupan (`dart run coverage:format_coverage`); tidak masuk kode produksi.
 - Tata letak lembar untuk Fase 3 yang dipilih di sini: batang skala berpusat y = 90 mm (di bawah tepi bawah penanda pada y = 75 mm). Rentang pembacaan penggaris yang diterima 80 sampai 120 mm (di luar itu `PrintScaleException`: biasanya salah satuan atau salah ukur).
 - Pembangkit kamera acak: `f` 0,7..0,9 sisi panjang, 0,09..0,15 mm/px di pusat, tilt 0..25 derajat, roll +-20, offset pusat lembar +-10 mm. Rentang ini dipilih agar seluruh bingkai 150 mm selalu berada di dalam citra 4000x3000 (diuji pada 200 kamera).
+
+## D19. Fase 3: konvensi pengukuran (2026-11-17)
+- Pengambilan sampel memakai `H` (lembar ke citra), bukan `H_inv`: untuk mengambil intensitas pada posisi metrik harus dipetakan mm ke piksel. `H_inv` hanya dibutuhkan untuk skala (`localMmPerPx` memakai Jacobian `H`, hasilnya sama dengan `LocalScale.mmPerPx`). Permintaan fase menyebut `H_inv`; ini penyimpangan sadar.
+- Sampler Catmull-Rom: bila dukungan 4x4 tidak seluruhnya di dalam patch hasilnya NaN (tanpa klem atau ekstrapolasi); profil yang keluar patch menjadi `null`, lalu ditolak dengan alasan `PATCH_TOO_SMALL`. Patch minimal kira-kira +-8 mm di sekitar titik ukur; untuk PSF patch harus mencakup tepi luar penanda (praktis seluruh bingkai 150 mm).
+- Arah retak dalam derajat dari sumbu x lembar (y ke bawah), normal `n = (-sin a, cos a)`, sama dengan `crackScene`.
+- Parameter model `[B, m, D, c, w]`; batas `D in [0, baseline]` (retak tidak bisa lebih gelap dari nol), `w in [0, 3 mm]`, `c in +-1,5 mm`. Lebar > 3 mm di luar rancangan (rentang profil +-3 mm): ditandai `PARAMETER_AT_BOUND`.
+
+## D20. Fase 3: sigma PSF adalah kernel semu, dan isotropik di ruang piksel
+- Sigma dari tepi penanda mencakup apertur piksel (varians 1/12 px^2) sehingga untuk PSF Gaussian sigma_g nilainya sekitar `sqrt(sigma_g^2 + 1/12)`. Itu benar untuk model retak karena retak melihat kernel yang sama; uji PSF membandingkan dengan nilai itu, bukan dengan sigma_g.
+- Blur citra isotropik di ruang piksel, bukan di ruang lembar. Di bawah tilt, sigma dalam mm berbeda menurut arah (hingga 1/cos tilt). Karena itu tiap tepi diubah ke piksel dengan mm/px searah normal tepi; median dan rasio anisotropi dihitung dalam piksel, dan sigma untuk retak = `sigma_px x mm/px sepanjang normal retak` (`PsfEstimate.sigmaMmAlong`). Median sigma dalam mm (definisi 5.3a) tetap dilaporkan (`sigmaMm`). Tanpa ini tilt 25 derajat memberi rasio anisotropi palsu.
+- `u_sigma_edge` = simpangan baku sampel sigma antar tepi (px), sesuai 5.3a. Ini mengukur ketelitian, bukan keakuratan (lihat D24).
+- Batas yang diketahui: dengan dua keluarga tepi (normal sumbu x dan y lembar), blur gerak pada 45 derajat terhadap tepi tidak terdeteksi (rasio ~1). Diuji dan dicatat. Sigma yang membesar tetap tertangkap oleh gerbang `maxSigmaPx`.
+
+## D21. Fase 3: gerbang kontras
+- 5.3 menyebut `D / sigma_noise >= 3`. Untuk retak lebih sempit dari sigma, `D` dan `w` kolinear (hanya luas `D*w` teridentifikasi), jadi `D` sendiri menyesatkan (menempel pada batas atas dengan nilai besar). Gerbang memakai kedalaman lembah model, `D (2 Phi(w/2sigma) - 1)`, yang sama dengan `D` untuk retak lebar dan yang benar-benar dibatasi data untuk retak sempit.
+- `sigma_noise = max(median RMS residu per profil, derau piksel patch)`. Residu per profil lebih kecil dari derau piksel karena interpolasi menghaluskan; derau patch (MAD dari `I - rata-rata 4 tetangga`, anggapan iid) memberi lantai. Anggapan iid dapat meremehkan derau nyata yang berkorelasi (dicatat).
+
+## D22. Fase 3: dua lintasan, penjajaran dan kovarians
+- Lintasan 2 menjajarkan profil pada kurva kuadrat robust yang dilewatkan pada pusat `c_j` per profil (default `alignWithSmoothedCenters`), bukan pada tiap `c_j` mentah. `c_j` mentah mengikuti derau per profil. Mode harfiah 5.3 tersedia lewat konfigurasi. Bukti SINTETIS (MEASUREMENT_NOTES 4.6): pada SNR rendah (derau 0,04, kedalaman 0,3) dan w 0,15 mm, sd galat 13,3 um (mentah) versus 7,0 um (kurva), rms 18,0 versus 13,1 um, dan mode mentah memunculkan `MODEL_MISFIT`; pada SNR tinggi keduanya identik (resolusi 0,1 um). Klaim awal bahwa mode mentah membiaskan lebar menjadi lebih sempit TIDAK terbukti; yang terbukti hanya varians lebih besar.
+- Kovarians `rho * s2 (J^T J)^-1`, `rho = 1,0` TIDAK dikalibrasi (ditandai di hasil). Sapuan sintetis menunjukkan perlu `rho` sekitar 5 untuk retak lebar (galat sebenarnya sekitar 2,3 kali `u_fit`); kalibrasi resmi tetap di studi cakupan (butir 7).
+
+## D23. Fase 3: pencarian punggung retak
+- Komponen nn Hessian dihitung pada profil melintang yang dirata-ratakan sepanjang retak (kernel memanjang), dengan pencarian skala-ruang (turunan kedua Gaussian, skala `sigma_px` sampai 1 mm), karena retak 2 mm tidak punya puncak tengah pada satu skala kecil. Kandidat harus punya sinyal/derau >= 5 dan puncak lokal sejati (respons dievaluasi 1 mm di luar radius sehingga punggung di luar 1,5 mm tampak sebagai lereng, bukan puncak palsu di tepi). Arah diperbarui dengan garis OLS melalui 4 pusat bagian (2 lintasan).
+
+## D24. Fase 3: ketidakpastian bentuk kernel (temuan sapuan)
+- Temuan SINTETIS: untuk retak sempit (w kurang dari sekitar 3 sigma) lebar dipengaruhi bentuk kernel, bukan hanya sigma: kernel nyata (Gaussian dikonvolusi apertur kotak) bukan Gaussian, sehingga ada bias sistematis positif (+9,8 sampai +39 um pada w 0,05 sampai 0,1 mm, sigma 0,6 sampai 2 px) yang tidak tertangkap `u_fit` (derau) maupun `u_sigma_edge` (ketelitian antar tepi, sekitar 1 persen). Tanpa tambahan, cakupan `2 u_frame` pada w = 0,05 mm hanya 33 persen (sigma 0,6 px) dan 76 persen (sigma 1 px).
+- Keputusan: `u_sigma_w` dihitung dengan `u_sigma = sqrt(u_sigma_edge^2 + (eps sigma)^2)`, `eps = 0,10` (`defaultKernelShapeRelUncertainty`), dapat diubah. Dari tiga nilai yang dicoba (0; 0,05; 0,10) hanya 0,10 mencapai cakupan >= 90 persen pada kasus terburuk (w 0,05 mm: 97 persen pada kedua sigma; dengan 0,05: 60 dan 90 persen). Nilai ini TIDAK divalidasi di perangkat; kemungkinan ponsel nyata lebih buruk (penajaman ISP, JPEG, tepi versus retak diproses beda). Retak lebar tidak diperbaiki oleh `eps`: kekurangan cakupannya (63 sampai 77 persen) berasal dari `rho` (D22).
+- Pengaruh pada anggaran 5.5: `u_sigma_w` di 5.5 = komponen ini.
+
+## D25. Fase 3: status per frame dan lantai
+- `measureFrame` mengembalikan `MeasureAccepted` (dengan status `TERUKUR`, `DI_BAWAH_BATAS_UKUR`, `TIDAK_TERUKUR`) atau `MeasureRejected` (alasan: patch terlalu kecil, tepi PSF tak tersedia, blur terlalu besar, blur anisotropik, jenuh, retak tak ditemukan, masukan tak valid). Penolakan berarti frame tak bisa diukur; `TIDAK_TERUKUR` berarti diukur tetapi gerbang kontras atau kesehatan fit gagal.
+- Lantai frame = `max(0,5 mm/px, 2 u_frame)` dengan `u_frame = sqrt(u_fit^2 + u_sigma_w^2)`; lantai kunjungan penuh (5.5) memakai `u_c` lengkap di fase agregasi. Di bawah lantai: `reportableWidthMm == null`.
+- Gerbang kualitas citra dari 5.4 (sigma, anisotropi, jenuh) dipakai di `measureFrame` memakai `QualityThresholds`. Piksel jenuh = di atas 0,995 atau di bawah 0,005 di dalam kotak +-5 mm.
+- `MODEL_MISFIT` bila `misfitRel` (bagian sistematis residu akhir, `sqrt(max(0, rms^2 - derau^2/N))`, dibagi kedalaman lembah) melebihi 1 persen. Ambang pertama (rasio residu/derau > 2,5) dibuang karena memberi alarm palsu pada citra sangat bersih (rasio sampai 3,2 pada derau 0,002 untuk model yang benar). Empiris (SINTETIS): model benar paling banyak 0,25 persen; tepi kasar 0,08 mm: 1,6; bayangan 0,9x: 3,4; noda amplitudo 0,1: 1,2 persen.
+
+## D26. Fase 3: linearisasi sRGB dan peringatan lebar
+- Model lebar linear terhadap cahaya; nilai JPEG berenkode gamma membiaskan lebar sub-piksel (SINTETIS: -3,9 persen pada 0,5 mm, -13 persen pada 0,2 mm). Ditambahkan `GrayPatch.linearizedFromSrgb()` dan `srgbToLinear`; adapter Fase 5 wajib memanggilnya. Dengan linearisasi galat kembali +1,7 / +3,8 / +10,7 um (0,5 / 0,2 / 0,1 mm). Apakah kurva nada ponsel mendekati sRGB hanya bisa dicek di perangkat. Ini satu-satunya penambahan API di luar enam berkas yang diminta selain `special.dart`, `stats.dart`, `rejection.dart`, dan harness (`patch_scene.dart`, `violations.dart`).
+- `WIDTH_BEYOND_VALIDATED` bila lebar > 1,05 x 2,0 mm: sapuan menunjukkan galat 68 +- 56 um pada 2,6 mm dengan `u_frame` 0,2 um.
+
+## D27. Fase 3: artefak renderer pada retak sejajar sumbu piksel
+- Retak tepat sejajar sumbu (0 atau 90 derajat) memberi bias +10,3 um pada S=4 dan -4,6 um pada S=8 di harness, sedangkan 20 derajat memberi +0,3 um. Penyebabnya kuantisasi sub-sampel renderer (aritmetika eksak: 8,5 px pada S=4, 8,25 px pada S=8, benar 8,333 px), bukan algoritma. Dugaan awal "kunci fase piksel" dan prediksi +2,5 um pada S=8 keliru dan dikoreksi oleh pengukuran. Kasus pelanggaran asumsi (bayangan, noda, retak kedua) dirotasi 20 derajat (`rotatedAboutOrigin`) agar artefak ini tidak tercampur.
+
+## D28. Fase 3: dependensi
+- Tidak ada dependensi baru. LM, fungsi CDF normal (deret positif, ~1e-16), statistik, dan interpolasi ditulis sendiri.

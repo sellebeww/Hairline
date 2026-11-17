@@ -6,10 +6,19 @@ library;
 
 export 'src/homography.dart';
 export 'src/linalg_small.dart';
+export 'src/lm.dart';
+export 'src/measure.dart';
+export 'src/patch.dart';
 export 'src/point.dart';
 export 'src/pose.dart';
+export 'src/profile_fit.dart';
+export 'src/psf.dart';
 export 'src/quality.dart';
+export 'src/rejection.dart';
+export 'src/ridge.dart';
 export 'src/sheet.dart';
+export 'src/special.dart';
+export 'src/stats.dart';
 
 /// Version of the core package, bumped with algorithm changes.
-const String hairlineCoreVersion = '0.1.0';
+const String hairlineCoreVersion = '0.3.0';
