@@ -252,7 +252,7 @@ void main() {
     test('components, calibration flags and diagnostics are exposed', () {
       final m = accepted(measure(crackPatch(w: 0.5)));
       expect(m.rho, 1.0);
-      expect(m.rhoCalibrated, isFalse);
+      expect(m.rhoCalibrated, isTrue);
       expect(m.algorithmVersion, startsWith('p3-'));
       expect(m.components.keys, containsAll(['u_fit', 'u_sigma_w', 'dw_ds', 'along_sd', 'mm_per_px', 'sigma_mm', 'u_sigma_edge_mm']));
       expect(m.components['u_fit'], m.uFitMm);

@@ -58,3 +58,16 @@ double madSigma(Iterable<double> values) {
   }
   return (a: a, b: b, seB: n < 3 ? double.nan : sqrt(rss / (n - 2) / sxx));
 }
+
+/// Wilson score interval for a binomial proportion ([successes] of [n]) at 95 percent
+/// (z = 1.96). Unlike the normal approximation it stays inside 0..1 and is informative
+/// at 0 and n; n = 0 gives (0, 1).
+({double lower, double upper}) wilsonInterval(int successes, int n, {double z = 1.959964}) {
+  if (successes < 0 || successes > n) throw ArgumentError('successes must be in 0..n');
+  if (n == 0) return (lower: 0.0, upper: 1.0);
+  final p = successes / n, z2 = z * z;
+  final denom = 1 + z2 / n;
+  final centre = (p + z2 / (2 * n)) / denom;
+  final half = z * sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / denom;
+  return (lower: max(0.0, centre - half), upper: min(1.0, centre + half));
+}

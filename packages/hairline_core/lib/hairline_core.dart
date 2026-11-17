@@ -19,6 +19,11 @@ export 'src/ridge.dart';
 export 'src/sheet.dart';
 export 'src/special.dart';
 export 'src/stats.dart';
+export 'src/student_t.dart';
+export 'src/uncertainty.dart';
+export 'src/aggregate.dart';
+export 'src/trend.dart';
+export 'src/validation.dart';
 
 /// Version of the core package, bumped with algorithm changes.
-const String hairlineCoreVersion = '0.3.0';
+const String hairlineCoreVersion = '0.4.0';

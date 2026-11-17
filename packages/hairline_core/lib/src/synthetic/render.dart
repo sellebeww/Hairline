@@ -119,20 +119,38 @@ Float64List _blur(Float64List src, int w, int h, double sx, double sy) {
   final rx = kx.length ~/ 2, ry = ky.length ~/ 2;
   final tmp = Float64List(w * h);
   for (var y = 0; y < h; y++) {
+    final row = y * w;
     for (var x = 0; x < w; x++) {
       var acc = 0.0;
-      for (var t = -rx; t <= rx; t++) {
-        acc += kx[t + rx] * src[y * w + (x + t).clamp(0, w - 1)];
+      if (x >= rx && x < w - rx) {
+        // Interior: no clamping. Same summation order as the border path.
+        final base = row + x - rx;
+        for (var t = 0; t < kx.length; t++) {
+          acc += kx[t] * src[base + t];
+        }
+      } else {
+        for (var t = -rx; t <= rx; t++) {
+          acc += kx[t + rx] * src[row + (x + t).clamp(0, w - 1)];
+        }
       }
-      tmp[y * w + x] = acc;
+      tmp[row + x] = acc;
     }
   }
   final out = Float64List(w * h);
   for (var y = 0; y < h; y++) {
+    final interior = y >= ry && y < h - ry;
     for (var x = 0; x < w; x++) {
       var acc = 0.0;
-      for (var t = -ry; t <= ry; t++) {
-        acc += ky[t + ry] * tmp[(y + t).clamp(0, h - 1) * w + x];
+      if (interior) {
+        var idx = (y - ry) * w + x;
+        for (var t = 0; t < ky.length; t++) {
+          acc += ky[t] * tmp[idx];
+          idx += w;
+        }
+      } else {
+        for (var t = -ry; t <= ry; t++) {
+          acc += ky[t + ry] * tmp[(y + t).clamp(0, h - 1) * w + x];
+        }
       }
       out[y * w + x] = acc;
     }

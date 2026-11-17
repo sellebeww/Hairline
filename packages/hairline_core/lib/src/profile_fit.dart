@@ -47,7 +47,7 @@ final class ProfileFitConfig {
     this.profiles = 40,
     this.halfRangeMm = 3,
     this.rho = 1.0,
-    this.rhoCalibrated = false,
+    this.rhoCalibrated = true,
     this.minContrastSnr = 3,
     this.maxWidthMm = 3,
     this.maxCondition = 1e12,
@@ -63,8 +63,11 @@ final class ProfileFitConfig {
   /// Profile half range across the crack.
   final double halfRangeMm;
 
-  /// Variance inflation for correlated interpolated samples (5.3). Initial value
-  /// 1.0 is NOT calibrated: it must come from the synthetic coverage study.
+  /// Variance inflation for correlated interpolated samples (5.3). 1.0 is the value
+  /// supported by the full-chain synthetic coverage study (SINTETIS, docs/SYNTHETIC_VALIDATION.md:
+  /// the interval coverage is at least 90 percent for every reported condition without
+  /// inflation, and inflating further only chases the renderer's own resolution). Not
+  /// validated on real devices.
   final double rho;
   final bool rhoCalibrated;
 

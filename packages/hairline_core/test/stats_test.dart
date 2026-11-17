@@ -5,6 +5,7 @@ import 'package:hairline_core/hairline_core.dart';
 import 'package:test/test.dart';
 
 void main() {
+  wilsonTests();
   test('median odd, even, unsorted; errors on empty', () {
     expect(median([3.0, 1.0, 2.0]), 2.0);
     expect(median([4.0, 1.0, 2.0, 3.0]), 2.5);
@@ -37,5 +38,26 @@ void main() {
     expect(ols([1.0, 1.0], [0.0, 1.0]).seB, isNaN);
     expect(ols([0.0, 1.0], [0.0, 1.0]).seB, isNaN);
     expect(() => ols([1.0], [1.0]), throwsArgumentError);
+  });
+}
+
+void wilsonTests() {
+  group('wilsonInterval (95 percent)', () {
+    test('9 of 10 -> (0.596, 0.982), the textbook Wilson values', () {
+      final w = wilsonInterval(9, 10);
+      expect(w.lower, closeTo(0.5958, 5e-4));
+      expect(w.upper, closeTo(0.9821, 5e-4));
+    });
+    test('0 of 10 -> upper 0.2775, 10 of 10 -> lower 0.7225 (never degenerate at the edges)', () {
+      expect(wilsonInterval(0, 10).lower, closeTo(0, 1e-12));
+      expect(wilsonInterval(0, 10).upper, closeTo(0.2775, 5e-4));
+      expect(wilsonInterval(10, 10).lower, closeTo(0.7225, 5e-4));
+      expect(wilsonInterval(10, 10).upper, closeTo(1, 1e-12));
+    });
+    test('n = 0 gives the uninformative interval and bad arguments throw', () {
+      expect(wilsonInterval(0, 0).lower, 0);
+      expect(wilsonInterval(0, 0).upper, 1);
+      expect(() => wilsonInterval(5, 4), throwsArgumentError);
+    });
   });
 }

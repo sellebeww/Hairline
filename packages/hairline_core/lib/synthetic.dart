@@ -10,3 +10,5 @@ export 'src/synthetic/noise.dart';
 export 'src/synthetic/patch_scene.dart';
 export 'src/synthetic/render.dart';
 export 'src/synthetic/violations.dart';
+export 'src/studies/synthetic_study.dart';
+export 'src/studies/study_analysis.dart';

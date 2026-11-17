@@ -72,17 +72,17 @@ ProfileFitResult fit(
 
 void main() {
   group('defaults', () {
-    test('rho starts at 1.0 and is marked as not calibrated (5.3)', () {
+    test('rho is 1.0 and flagged as calibrated against the synthetic study (5.3, docs/SYNTHETIC_VALIDATION.md)', () {
       const c = ProfileFitConfig();
       expect(c.rho, 1.0);
-      expect(c.rhoCalibrated, isFalse);
+      expect(c.rhoCalibrated, isTrue);
       expect(c.profiles, 40);
       expect(c.segmentMm, 4);
       expect(c.halfRangeMm, 3);
       expect(c.minContrastSnr, 3);
       final r = fit(patchOf());
       expect(r.rho, 1.0);
-      expect(r.rhoCalibrated, isFalse);
+      expect(r.rhoCalibrated, isTrue);
     });
   });
 
