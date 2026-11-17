@@ -1,0 +1,15 @@
+.DS_Store
+.dart_tool/
+.packages
+build/
+coverage/
+*.iml
+.idea/
+.vscode/
+local.properties
+*.keystore
+*.jks
+key.properties
+.gradle/
+.flutter-plugins*
+*.g.dart

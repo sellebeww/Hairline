@@ -1,0 +1,12 @@
+name: hairline_core
+description: Pure Dart geometry and measurement core for Hairline (homography, sub-pixel crack width, uncertainty). No Flutter, no OpenCV.
+version: 0.1.0
+publish_to: none
+# Copyright (c) 2026 Vassel Goleyu. MIT License.
+
+environment:
+  sdk: ^3.13.4
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
