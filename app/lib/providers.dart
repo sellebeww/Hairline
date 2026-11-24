@@ -50,3 +50,8 @@ VisitProcessor visitProcessor(Ref ref) => VisitProcessor(
       repository: ref.watch(hairlineRepositoryProvider),
       storage: ref.watch(frameStorageProvider),
     );
+
+/// Removes photo files that no stored frame refers to (left by a crash between writing and
+/// committing). Call once at start, before any capture. Returns the removed names.
+Future<List<String>> sweepOrphanFrames(HairlineRepository repository, FrameStorage storage) async =>
+    storage.deleteUnreferenced(await repository.allFramePaths());

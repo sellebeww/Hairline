@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Vassel Goleyu. MIT License.
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,6 +46,23 @@ void main() {
   test('an app that did not wire the native ports fails loudly instead of measuring with nothing', () {
     final c = ProviderContainer(overrides: [appDirectoryProvider.overrideWithValue(tmp)]);
     expect(() => c.read(frameProcessorProvider), throwsA(anything));
+    c.dispose();
+  });
+
+  test('the start-up sweep deletes photo files that no stored frame refers to and keeps the others', () async {
+    final c = container();
+    final storage = c.read(frameStorageProvider);
+    final repo = c.read(hairlineRepositoryProvider);
+    final saved = await storage.saveVisitFrames([Uint8List.fromList([1, 2, 3])]);
+    final orphan = await storage.saveVisitFrames([Uint8List.fromList([9, 9])]);
+    final site = await repo.createSite(name: 'Uji');
+    await repo.createCrack(
+      siteId: site, label: 'A', sheetId: 0, printScale: 1, printScaleURel: 0.003,
+      pointMm: const Pt(0, 0), directionDeg: 10, createdAt: DateTime.utc(2026, 11, 17),
+    );
+    // No visit refers to either file yet: both are orphans.
+    expect(await sweepOrphanFrames(repo, storage), unorderedEquals([saved.single.name, orphan.single.name]));
+    expect(await sweepOrphanFrames(repo, storage), isEmpty);
     c.dispose();
   });
 }

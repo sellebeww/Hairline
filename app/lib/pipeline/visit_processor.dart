@@ -40,10 +40,14 @@ final class VisitCancelledException implements Exception {
 
 /// Camera facts that go into the visit and into the intrinsics approximation (5.2).
 final class CameraInfo {
-  const CameraInfo({this.focalMm, this.sensorLongSideMm});
+  const CameraInfo({this.focalMm, this.sensorLongSideMm, this.flags = const []});
   final double? focalMm, sensorLongSideMm;
 
-  Map<String, Object?> toJson() => {'v': 1, 'focal_mm': focalMm, 'sensor_long_side_mm': sensorLongSideMm};
+  /// Capture conditions worth keeping with the visit, e.g. `fokus_tidak_terkunci`.
+  final List<String> flags;
+
+  Map<String, Object?> toJson() =>
+      {'v': 1, 'focal_mm': focalMm, 'sensor_long_side_mm': sensorLongSideMm, 'flags': flags};
 }
 
 /// Result of processing a burst or a stored visit.
@@ -93,7 +97,12 @@ class VisitProcessor {
   /// Stored in `measurements.algorithm_version`.
   final String algorithmVersion;
 
-  Future<List<FrameOutcome>> _processAll(List<Uint8List> photos, FrameContext ctx, CancelToken? cancel) async {
+  Future<List<FrameOutcome>> _processAll(
+    List<Uint8List> photos,
+    FrameContext ctx,
+    CancelToken? cancel, [
+    void Function(int done, int total)? onProgress,
+  ]) async {
     final out = <FrameOutcome>[];
     for (final photo in photos) {
       // Sequential on purpose: a 12 MP photo and its decoded copy are big.
@@ -102,6 +111,7 @@ class VisitProcessor {
       final unlisten = cancel?.listen(job.cancel);
       try {
         out.add(await job.result);
+        onProgress?.call(out.length, photos.length);
       } on FrameCancelledException {
         throw const VisitCancelledException();
       } finally {
@@ -137,9 +147,10 @@ class VisitProcessor {
     String kind = 'followup',
     String? referencePoseJson,
     CancelToken? cancel,
+    void Function(int done, int total)? onProgress,
   }) async {
     final crack = await repository.crackContext(crackId);
-    final outcomes = await _processAll(photos, _context(crack, camera), cancel);
+    final outcomes = await _processAll(photos, _context(crack, camera), cancel, onProgress);
     final result = _aggregate(outcomes, crack);
     if (!result.storable) {
       return VisitNotStored(result: result, frames: outcomes, reasons: _reasons(result, outcomes, photos.length));
