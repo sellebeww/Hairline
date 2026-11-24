@@ -116,6 +116,22 @@ void main() {
     blank.dispose();
   });
 
+  test('the live detector finds the same ids from a raw gray buffer and refuses a buffer of the wrong size', () {
+    final scene = _scene();
+    final bytes = Uint8List.fromList(scene.data);
+    scene.dispose();
+    final dets = const OpenCvGrayMarkerDetector().detectGray(bytes, _n, _n);
+    expect(dets.map((d) => d.id).toSet(), {0, 1, 2, 3});
+    for (final d in dets) {
+      final want = _cornersOf(d.id);
+      for (var k = 0; k < 4; k++) {
+        expect(d.corners[k].distanceTo(want[k]), lessThan(1.0), reason: 'marker ${d.id} corner $k (reasoned tolerance, not measured)');
+      }
+    }
+    expect(() => const OpenCvGrayMarkerDetector().detectGray(Uint8List(10), _n, _n), throwsArgumentError);
+    expect(const OpenCvGrayMarkerDetector().detectGray(Uint8List(100 * 100)..fillRange(0, 10000, 255), 100, 100), isEmpty);
+  });
+
   test('the detector refuses an image that is not an OpenCvDecodedImage', () {
     expect(() => const OpenCvMarkerDetector().detect(_Foreign()), throwsArgumentError);
   });

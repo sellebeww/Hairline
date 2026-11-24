@@ -43,6 +43,16 @@ abstract interface class MarkerDetector {
   List<MarkerDetection> detect(DecodedImage image);
 }
 
+/// Detects markers in a raw 8-bit grayscale buffer (row-major, no padding), for the live
+/// preview. Same contract as [MarkerDetector] for the returned corners (coordinates in
+/// the pixel grid of the buffer). Implementations keep no native object between calls.
+abstract interface class GrayMarkerDetector {
+  List<MarkerDetection> detectGray(Uint8List gray, int width, int height);
+}
+
+/// Builds the live detector inside the detection isolate (top-level or static function).
+typedef GrayDetectorFactory = GrayMarkerDetector Function();
+
 /// The two adapters a frame needs. Built inside the worker isolate by a factory.
 final class FramePorts {
   const FramePorts({required this.source, required this.detector});

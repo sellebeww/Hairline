@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Vassel Goleyu. MIT License.
+import 'dart:typed_data';
+
 import 'package:hairline_core/hairline_core.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 
@@ -23,25 +25,45 @@ final class OpenCvMarkerDetector implements MarkerDetector {
     if (image is! OpenCvDecodedImage) {
       throw ArgumentError.value(image, 'image', 'OpenCvMarkerDetector needs an OpenCvDecodedImage');
     }
+    return ResourceScope.run((scope) => _detectMarkers(scope, image.gray));
+  }
+}
+
+/// The same detector for the live preview: a raw 8-bit gray buffer (the decimated Y plane
+/// of the camera stream) instead of a decoded photo. The `Mat` made from the buffer is
+/// released inside the call, so the detection isolate holds no native object between frames.
+final class OpenCvGrayMarkerDetector implements GrayMarkerDetector {
+  const OpenCvGrayMarkerDetector();
+
+  @override
+  List<MarkerDetection> detectGray(Uint8List gray, int width, int height) {
+    if (width < 1 || height < 1 || gray.length != width * height) {
+      throw ArgumentError('gray buffer of ${gray.length} bytes is not ${width}x$height');
+    }
     return ResourceScope.run((scope) {
-      final params = scope.add(cv.ArucoDetectorParameters.empty(), (p) => p.dispose())..cornerRefinementMethod = cornerRefineSubpix;
-      final dict = scope.add(cv.ArucoDictionary.predefined(cv.PredefinedDictionaryType.DICT_4X4_50), (d) => d.dispose());
-      final detector = scope.add(cv.ArucoDetector.create(dict, params), (d) => d.dispose());
-      final (corners, ids, rejected) = detector.detectMarkers(image.gray);
-      scope.add(corners, (v) => v.dispose());
-      scope.add(ids, (v) => v.dispose());
-      scope.add(rejected, (v) => v.dispose());
-      final seen = <int>{};
-      final out = <MarkerDetection>[];
-      for (var k = 0; k < ids.length; k++) {
-        final id = ids[k];
-        if (id < 0 || id >= arucoDictionarySize || !seen.add(id)) continue;
-        final quad = scope.add(corners[k], (v) => v.dispose());
-        if (quad.length != 4) continue;
-        final pts = [for (var j = 0; j < 4; j++) scope.add(quad[j], (pt) => pt.dispose())];
-        out.add(MarkerDetection(id: id, corners: [for (final pt in pts) Pt(pt.x, pt.y)]));
-      }
-      return out;
+      final mat = scope.add(cv.Mat.fromList(height, width, cv.MatType.CV_8UC1, gray), (m) => m.dispose());
+      return _detectMarkers(scope, mat);
     });
   }
+}
+
+List<MarkerDetection> _detectMarkers(ResourceScope scope, cv.Mat gray) {
+  final params = scope.add(cv.ArucoDetectorParameters.empty(), (p) => p.dispose())..cornerRefinementMethod = cornerRefineSubpix;
+  final dict = scope.add(cv.ArucoDictionary.predefined(cv.PredefinedDictionaryType.DICT_4X4_50), (d) => d.dispose());
+  final detector = scope.add(cv.ArucoDetector.create(dict, params), (d) => d.dispose());
+  final (corners, ids, rejected) = detector.detectMarkers(gray);
+  scope.add(corners, (v) => v.dispose());
+  scope.add(ids, (v) => v.dispose());
+  scope.add(rejected, (v) => v.dispose());
+  final seen = <int>{};
+  final out = <MarkerDetection>[];
+  for (var k = 0; k < ids.length; k++) {
+    final id = ids[k];
+    if (id < 0 || id >= arucoDictionarySize || !seen.add(id)) continue;
+    final quad = scope.add(corners[k], (v) => v.dispose());
+    if (quad.length != 4) continue;
+    final pts = [for (var j = 0; j < 4; j++) scope.add(quad[j], (pt) => pt.dispose())];
+    out.add(MarkerDetection(id: id, corners: [for (final pt in pts) Pt(pt.x, pt.y)]));
+  }
+  return out;
 }
