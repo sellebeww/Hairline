@@ -14,3 +14,7 @@
 - Dampak Fase 5: tes adapter (`packages/hairline_opencv/test/opencv_adapters_test.dart`: ID dan urutan sudut pada rotasi 0/90/180/270 dan perspektif, id di luar lembar, tanpa penanda, dekode, ROI, dispose idempotent, kebocoran RSS pada 30 putaran 12 MP) berstatus **ditulis, belum dijalankan**. `flutter analyze` paket itu bersih. Toleransi (0,8 px sudut, 150 MB RSS) adalah penalaran, bukan hasil ukur.
 - `app/` belum bergantung pada `hairline_opencv` (D34), sehingga APK dari repo ini belum dapat mendeteksi penanda sampai dependensi disambungkan.
 - Opsi: (1) pasang Xcode penuh lalu `make opencv-test`; (2) job CI `opencv` (Linux, `continue-on-error`) mungkin sudah cukup, belum dilihat hijau; (3) perangkat Android.
+
+### Pembaruan B1 (Fase 6, 2026-11-25)
+- `OpenCvGrayMarkerDetector` (deteksi live dari buffer abu-abu) dan tesnya (`packages/hairline_opencv/test/opencv_adapters_test.dart`, tes baru "the live detector ...") ditulis, `flutter analyze` bersih, BELUM dijalankan: akar masalah sama (build native OpenCV tidak jalan di host tanpa Xcode penuh).
+- Dampak Fase 6: tanpa dependensi `hairline_opencv` di `app/`, layar pengambilan nyata tidak dapat mendeteksi penanda (menampilkan "Detektor penanda belum tersedia"). Alur ujung ke ujung terbukti hanya dengan `FakeCameraService` dan penanda tertanam (SINTETIS). Menyambungkan: dependensi di `app/pubspec.yaml`, dua override di `main.dart` (`openCvPorts`, `openCvGrayDetector`), lalu DEVICE_TEST.

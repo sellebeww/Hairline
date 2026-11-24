@@ -1,6 +1,6 @@
 # PROGRESS
 
-Terakhir diperbarui: 2026-11-17, akhir Fase 5.
+Terakhir diperbarui: 2026-11-25, akhir Fase 6.
 
 ## Fase
 
@@ -11,7 +11,7 @@ Terakhir diperbarui: 2026-11-17, akhir Fase 5.
 | 3 | Pengukuran lebar retak sub-pixel (hairline_core): patch/sampler, LM, PSF, punggung retak, profil, orkestrasi frame | SELESAI-TERVERIFIKASI (dart test 287 lulus, cakupan 98,4 persen); akurasi: TERVERIFIKASI-SINTETIS |
 | 4 | Anggaran ketidakpastian, agregasi, tren, statistik pelat, studi sintetis, kalibrasi `rho` (hairline_core) | SELESAI-TERVERIFIKASI (dart test 401 lulus, cakupan 98,2 persen, `make verify` bersih); perilaku/cakupan: TERVERIFIKASI-SINTETIS |
 | 5 | Port + pipeline frame (core), adapter OpenCV (paket terpisah), isolate, Drift, penyimpanan foto, VisitProcessor, provider | SELESAI-TERVERIFIKASI untuk isolate/pipeline/Drift/kunjungan/provider (core 415 tes, app 50 tes, `make verify` bersih); adapter OpenCV: SELESAI-PERLU-UJI-PERANGKAT (ditulis, analyze bersih, tes BELUM dijalankan, B1); app belum bergantung pada paket adapter (D34) |
-| 6 | Belum dimulai | BELUM |
+| 6 | Alur pengambilan: CameraService (lifecycle, burst, kunci), kanal Kotlin lensa, deteksi live di isolate + throttle, overlay, mesin status, gerbang kualitas pra-simpan, simulasi | SELESAI-TERVERIFIKASI untuk mesin status, analisis pose live, throttle/isolate, lifecycle `DeviceCameraService` (driver tiruan), kanal lensa (channel tiruan), overlay (widget test), alur ujung ke ujung dengan `FakeCameraService` (SINTETIS; app 149 tes, `make verify` bersih; APK debug dan rilis terbangun); kamera nyata (`CameraPluginDriver`), kunci fokus, kanal Kotlin di perangkat, detektor live OpenCV: SELESAI-PERLU-UJI-PERANGKAT (docs/DEVICE_TEST.md) |
 | 7 | Belum dimulai | BELUM |
 | 8 | Belum dimulai | BELUM |
 | 9 | Belum dimulai | BELUM |
@@ -21,8 +21,8 @@ Terakhir diperbarui: 2026-11-17, akhir Fase 5.
 | # | Butir | Status | Kode/test |
 |---|---|---|---|
 | 1 | Lembar bingkai PDF | BELUM | - |
-| 2 | Deteksi penanda + homografi | Bagian homografi/diagnostik: TERVERIFIKASI-SINTETIS. Deteksi penanda (opencv_dart): adapter ditulis di packages/hairline_opencv, tes BELUM dijalankan (B1) | lib/src/homography.dart, test/homography_test.dart; spike: tools/opencv_spike |
-| 3 | Panduan pose + burst + gerbang kualitas | Logika pose dan gerbang geometri: TERVERIFIKASI-SINTETIS. Overlay, burst, kamera, gerbang citra: BELUM | lib/src/pose.dart, lib/src/quality.dart, test/pose_test.dart, test/quality_test.dart |
+| 2 | Deteksi penanda + homografi | Bagian homografi/diagnostik: TERVERIFIKASI-SINTETIS. Deteksi penanda (opencv_dart): adapter foto dan adapter live (`OpenCvGrayMarkerDetector`) ditulis di packages/hairline_opencv, tes BELUM dijalankan (B1) | lib/src/homography.dart, test/homography_test.dart; spike: tools/opencv_spike |
+| 3 | Panduan pose + burst + gerbang kualitas | Logika pose, gerbang geometri, mesin status alur, analisis live (stabilitas, referensi, hantu), throttle, urutan burst dan siklus hidup (driver tiruan), gerbang kualitas pra-simpan lewat `VisitProcessor`: SELESAI-TERVERIFIKASI / TERVERIFIKASI-SINTETIS. Kamera nyata (fokus/eksposur terkunci benar-benar bertahan, panggilan masuk, rotasi, multi-lensa, panas), overlay terhadap pratinjau nyata, kanal Kotlin, detektor OpenCV live: SELESAI-PERLU-UJI-PERANGKAT | app/lib/capture/*, app/lib/debug/*, app/android/.../LensInfoChannel.kt, app/test/capture/*, docs/DEVICE_TEST.md; core: lib/src/{pose,quality,frame_ports}.dart |
 | 4 | Pengukuran lebar retak sub-pixel | Inti (satu frame, agregasi median, anggaran 5.5, `k` Welch-Satterthwaite, batas ukur): TERVERIFIKASI-SINTETIS. Adapter citra dan validasi perangkat: BELUM | lib/src/{patch,lm,psf,ridge,profile_fit,measure,uncertainty,aggregate,student_t}.dart, test/{...,uncertainty,aggregate,student_t}_test.dart, docs/MEASUREMENT_NOTES.md, docs/SYNTHETIC_VALIDATION.md |
 | 5 | Penyimpanan Drift | SELESAI-TERVERIFIKASI (skema 5.7, FK, migrasi, atomisitas, pemrosesan ulang tanpa menimpa, foto privat + SHA-256, maks 5) | app/lib/data, app/lib/pipeline, app/test/data, app/test/pipeline |
 | 6 | Tren 2 sampai 5 kunjungan | Logika inti (delta, `u_delta`, z, klasifikasi, MDC, peringatan konteks, tanpa regresi): TERVERIFIKASI-SINTETIS. Penyimpanan dan layar: BELUM | lib/src/trend.dart, test/trend_test.dart |
@@ -80,12 +80,19 @@ Hasil Fase 2 (SINTETIS, seed tetap, lihat DECISIONS D17 dan D18): derau sudut 0,
 
 - JPEG q85/q95 vs mentah: pergeseran lebar 0,5 / 0,2 um pada 0,6 mm, di dalam `U` 128,7 um (satu seed, codec Dart, detektor tersimulasi). MODEL_MISFIT dikecualikan dari median (D36). Patch per penanda, bukan seluruh lembar.
 
+## Hasil Fase 6 (apa yang terbukti dan apa tidak)
+
+- Terbukti di host (SINTETIS, tanpa kamera): alur baseline lalu follow-up ujung ke ujung (`app/test/capture/capture_controller_test.dart`, grup "end to end"): deteksi live di isolate, siap setelah 5 frame mantap, burst 6, pemrosesan lewat isolate dan gerbang, kunjungan dasar tersimpan dengan `reference_pose_json`, hantu muncul di follow-up. Kunjungan tak lolos tidak menulis apa pun (tabel visits dan folder foto kosong).
+- Tes lifecycle dengan driver tiruan menangkap: pause di tengah burst, pause menunggu bidikan berjalan, dispose ganda, callback stream basi, burst ganda, urutan stream/kunci/bidik/buka kunci. Tes ujung ke ujung menemukan dua bug nyata (provider auto-dispose menutup kamera, ref mati setelah layar ditutup), keduanya diperbaiki (D42).
+- Manifest rilis terverifikasi dari APK rilis yang terbangun: hanya `CAMERA` (tanpa `INTERNET`).
+- TIDAK terbukti: apa pun tentang kamera nyata (fokus terkunci bertahan, CameraX tidak memutar bingkai analisis, kinerja stream beresolusi maksimum, panas, penyelarasan overlay), kanal Kotlin di perangkat (hanya terkompilasi), deteksi OpenCV live. Nilai ambang stabilitas dan 5 frame adalah nilai awal.
+
 ## Konteks untuk sesi berikutnya
 
-- Baca CLAUDE.md, DECISIONS.md (D29 sampai D33), docs/SYNTHETIC_VALIDATION.md (bagian 8: apa yang didukung dan tidak), MEASUREMENT_NOTES.md.
-- API Fase 4: `FrameRecord.fromMeasurement(m, rmsPx:, looMm:, tiltDeg:)` -> `FrameInput.accepted/rejected` -> `aggregateVisit(frames, options: UncertaintyOptions(dzMm, uPrintRel, uDevMm))` -> `VisitResult` (`status`, `budget`, `reportableWidthMm`, `storable`, `frameRejections`). Tren: `computeTrend(List<TrendVisit>, uPrintRel:)`. Pelat: `computePlateStats`, `deriveUDev` (hasil dipakai di `UncertaintyOptions.uDevMm`).
-- Adapter Fase 5 tetap WAJIB: patch abu-abu +-8 mm di titik ukur dan tepi penanda, `linearizedFromSrgb()`, hitung `rmsPx`/`looMm`/`tiltDeg` dari `estimateSheetHomography` dan `estimateTilt`, jalankan `evaluateFrameGeometry` lebih dulu. Frame `MODEL_MISFIT` BELUM dikecualikan di `aggregateVisit` (FrameRecord belum membawa peringatan): putuskan di Fase 5.
-- `u_dev` bawaan 0,5 mm/px dan `dz` 0,3 mm menentukan hampir seluruh `U` dan `MDC`; hanya validasi pelat nyata yang boleh mengecilkannya. Hasil selalu bertanda BELUM_DIVALIDASI tanpa `uDevMm`.
-- Studi ulang: `cd packages/hairline_core && dart run tool/run_synthetic_study.dart simulate --reps 8 --workers 4` (resumable, 1 sampai 3 jam, butuh memori; proses terpisah), lalu `renderer-check` dan `analyze`. Mesin ini hanya 8 GB: tutup emulator/IDE saat studi.
-- `opencv_dart` TIDAK ada di `app/pubspec.yaml` (D34, B1): sambungkan `packages/hairline_opencv` + override `framePortsFactoryProvider` di main.dart begitu bisa dibangun (Linux/Xcode), jalankan `make opencv-test`. Fase 6: `VisitProcessor.processBurst` menerima `List<Uint8List>` (pertimbangkan jalur file untuk burst besar), `deleteUnreferenced` belum dipanggil saat start. Suite core sekitar 3 sampai 6 menit.
-- Jika Gradle gagal dengan NoSuchFileException di cache transforms: `app/android/gradlew --stop` lalu ulangi.
+- Baca CLAUDE.md, DECISIONS.md D39 sampai D42 (Fase 6), BLOCKERS B1, docs/DEVICE_TEST.md.
+- Alur pengambilan: `app/lib/capture/` (`capture_flow.dart` reducer murni, `capture_controller.dart` orkestrasi, `device_camera_service.dart` + `camera_driver.dart`, `detection_worker.dart`, `live_analysis.dart`, `capture_page.dart`). Rute `/capture/:crackId`; tombol debug di halaman awal membuat retak uji karena layar pembuat retak belum ada (Fase berikutnya: buat retak, tandai titik ukur dan arah, layar hasil dan tren).
+- Simulasi tanpa kamera: `cd app && flutter run -t lib/main_fake.dart` (butuh sekitar 15 detik membuat foto sintetis); tes: `cd app && flutter test test/capture`.
+- `app/` belum bergantung pada `hairline_opencv` (D34, B1): sambungkan dependensi, `framePortsFactoryProvider` (`openCvPorts`) dan `grayDetectorFactoryProvider` (`openCvGrayDetector`) di `main.dart` (ada TODO), lalu jalankan `make opencv-test` dan DEVICE_TEST.
+- `VisitProcessor.processBurst` kini menerima `onProgress`; `CameraInfo` membawa `flags`. `u_dev` tetap bawaan tak tervalidasi (hasil berlabel `BELUM_DIVALIDASI`) sampai validasi pelat Fase 7.
+- Studi sintetis Fase 4 (`docs/SYNTHETIC_VALIDATION.md`): `rho = 1,0` didukung hanya terhadap simulasi; `U` bawaan konservatif. Suite core sekitar 2 sampai 6 menit; mesin 8 GB: tutup emulator saat studi.
+- Gradle: bila NoSuchFileException di cache transforms: `app/android/gradlew --stop` lalu ulangi. Build APK memerlukan sekitar 3 sampai 5 menit; jalankan di latar belakang.
