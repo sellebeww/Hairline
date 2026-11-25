@@ -45,11 +45,11 @@ SyntheticCamera _camera({double t = 1}) {
 /// The pose the script ends on (and the baseline reference of a first visit).
 SyntheticCamera demoTargetCamera() => _camera();
 
-LumaFrame _liveFrame(SyntheticCamera cam, Random rng, {Set<int> omit = const {}, bool blind = false}) {
+LumaFrame _liveFrame(SyntheticCamera cam, Random rng, {Set<int> omit = const {}, bool blind = false, int sheetId = 0}) {
   const w = 40, h = 37; // 1600 x 1500 decimated by 40 (offset 20)
   final dets = blind
       ? const <MarkerDetection>[]
-      : SyntheticDetector(noisePx: 0.2, rng: rng).detect(cam, sheetId: 0, omit: omit);
+      : SyntheticDetector(noisePx: 0.2, rng: rng).detect(cam, sheetId: sheetId, omit: omit);
   final small = [
     for (final d in dets) MarkerDetection(id: d.id, corners: [for (final c in d.corners) Pt((c.x - _step ~/ 2) / _step, (c.y - _step ~/ 2) / _step)]),
   ];
@@ -93,6 +93,41 @@ FakeScenario buildFakeScenario({bool renderCrack = true, int seed = 11, int stil
           demoImage.width,
           demoImage.height,
           SyntheticDetector(noisePx: 0.2, rng: Random(seed + 100 + i)).detect(target, sheetId: 0),
+        ),
+    ],
+  );
+}
+
+/// Scripted recording of the validation plate (sheet 11) for the simulated plate validation.
+/// The lines are printed [extraWidthMm] wider than nominal, like toner does: that is the TRUE
+/// width a characterized truth would contain (SINTETIS, nothing comes from a phone).
+FakeScenario buildPlateScenario({int seed = 11, int stills = 6, double extraWidthMm = 0.03}) {
+  final rng = Random(seed);
+  final target = demoTargetCamera();
+  final live = <LumaFrame>[
+    for (var i = 0; i < 6; i++) _liveFrame(target, rng, blind: true, sheetId: plateSheetId),
+    for (var i = 0; i < 20; i++) _liveFrame(_camera(t: 0.2 + 0.8 * i / 19), rng, sheetId: plateSheetId),
+    for (var i = 0; i < 40; i++) _liveFrame(target, rng, sheetId: plateSheetId),
+  ];
+  final gray = srgbBytes(renderGray(
+    width: demoImage.width,
+    height: demoImage.height,
+    toScene: (px, py) => target.unproject(Pt(px, py)),
+    scene: plateScene(widthsMm: {for (final l in buildPlateLines()) l.id: l.nominalMm + extraWidthMm}),
+    supersample: 2,
+    psfSigmaPx: 1,
+    noiseSigma: 0.004,
+    rng: Random(seed),
+  ));
+  return FakeScenario(
+    live: live,
+    stills: [
+      for (var i = 0; i < stills; i++)
+        SyntheticPhotoCodec.encode(
+          gray,
+          demoImage.width,
+          demoImage.height,
+          SyntheticDetector(noisePx: 0.2, rng: Random(seed + 100 + i)).detect(target, sheetId: plateSheetId),
         ),
     ],
   );

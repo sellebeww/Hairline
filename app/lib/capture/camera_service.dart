@@ -70,6 +70,9 @@ typedef FrameOffer = bool Function(LumaFrame Function() produce);
 /// Back camera for the capture flow. Implementations: [DeviceCameraService] (the
 /// `camera` package) and `FakeCameraService` (debug and tests).
 abstract interface class CameraService {
+  /// True for a camera that replays synthetic photos: what it produces is never PERANGKAT data.
+  bool get isSimulated;
+
   /// Opens the camera (asks for the permission), flash off, portrait capture orientation.
   /// Throws [CameraFailure].
   Future<CameraSetup> initialize();

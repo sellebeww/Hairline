@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Vassel Goleyu. MIT License.
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hairline/sheet/sheet_pdf.dart';
@@ -46,5 +47,18 @@ void main() {
       expect((await buildSheetPdf(s, PaperSize.letter)).length, greaterThan(500));
     }
     expect(buildSheetPdf(12, PaperSize.a4), throwsRangeError);
+  });
+
+  test('plate PDF: same marker squares as the sheet, 32 line rectangles of the nominal widths (vector, mm exact)', () async {
+    final text = latin1.decode(await buildPlatePdf(PaperSize.a4, compress: false));
+    final rects = _rects(text);
+    final big = rects.where((r) => (r[2] / ptPerMm - 30).abs() < 0.01 && (r[3] / ptPerMm - 30).abs() < 0.01);
+    expect(big, hasLength(4));
+    final lines = rects.where((r) => (max(r[2], r[3]) / ptPerMm - plateLineLengthMm).abs() < 0.001 && min(r[2], r[3]) / ptPerMm < 2.5).toList();
+    expect(lines, hasLength(32));
+    final widths = [for (final r in lines) double.parse((min(r[2], r[3]) / ptPerMm).toStringAsFixed(3))]..sort();
+    expect(widths.first, 0.1);
+    expect(widths.last, 2.0);
+    expect(widths.where((w) => w == 0.5), hasLength(4));
   });
 }

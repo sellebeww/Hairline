@@ -11,6 +11,7 @@ import 'debug/fake_scenario.dart';
 import 'l10n/strings.dart';
 import 'main.dart';
 import 'providers.dart';
+import 'validation/validation_providers.dart';
 
 /// Debug entry point: the whole app on a scripted fake camera and synthetic photos, no
 /// camera and no OpenCV needed. Run with `flutter run -t lib/main_fake.dart`. Add a site and
@@ -24,6 +25,7 @@ Future<void> main() async {
     home: Scaffold(body: Center(child: Padding(padding: EdgeInsets.all(24), child: Text(Strings.demoPreparing)))),
   ));
   final scenario = await Isolate.run(buildFakeScenario);
+  final plate = await Isolate.run(buildPlateScenario);
   final dir = await Directory.systemTemp.createTemp('hairline_sim_');
   runApp(ProviderScope(
     overrides: [
@@ -31,7 +33,8 @@ Future<void> main() async {
       framePortsFactoryProvider.overrideWithValue(embeddedFramePorts),
       grayDetectorFactoryProvider.overrideWithValue(embeddedGrayDetector),
       cameraServiceProvider.overrideWith((ref) {
-        final camera = scenario.service();
+        // A plate validation in progress needs the plate recording (sheet 11), a crack needs sheet 0.
+        final camera = (ref.watch(validationSetupProvider) == null ? scenario : plate).service();
         ref.onDispose(camera.dispose);
         return camera;
       }),

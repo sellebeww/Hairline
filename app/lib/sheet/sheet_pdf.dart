@@ -20,7 +20,22 @@ SheetLabels sheetLabels(int sheetId) => SheetLabels(
 /// Builds the PDF of sheet [sheetId] on [paper]: the layout of the core, vector only, one
 /// page of exactly the paper size, at nominal size (the user prints it at 100 percent).
 /// [compress] false keeps the content stream readable (tests).
-Future<Uint8List> buildSheetPdf(int sheetId, PaperSize paper, {bool compress = true}) async {
+Future<Uint8List> buildSheetPdf(int sheetId, PaperSize paper, {bool compress = true}) async =>
+    _buildPdf(buildSheetLayout(sheetId, paper, sheetLabels(sheetId)), paper, compress);
+
+/// Labels of the validation plate: the sheet labels of [plateSheetId] with plate wording.
+SheetLabels plateSheetLabels() => SheetLabels(
+      title: Strings.printPlateTitleLabel,
+      cutHint: Strings.plateCutHint,
+      scaleBar: Strings.sheetPrintedScaleBar,
+      printNotes: Strings.sheetPrintedNotes,
+    );
+
+/// The validation plate as a vector PDF: marker layout of sheet 11 plus the 32 lines.
+Future<Uint8List> buildPlatePdf(PaperSize paper, {bool compress = true}) async =>
+    _buildPdf(buildPlateLayout(paper, plateSheetLabels(), const PlateLabels(legend: Strings.plateLegend)), paper, compress);
+
+Future<Uint8List> _buildPdf(List<SheetPrimitive> primitives, PaperSize paper, bool compress) async {
   final doc = PdfDocument(compress: compress);
   final format = PdfPageFormat(paper.widthMm * ptPerMm, paper.heightMm * ptPerMm);
   final page = PdfPage(doc, pageFormat: format);
@@ -29,7 +44,7 @@ Future<Uint8List> buildSheetPdf(int sheetId, PaperSize paper, {bool compress = t
 
   // PDF y points up; the layout's y points down from the top of the page.
   double y(double mm) => format.height - mm * ptPerMm;
-  for (final p in buildSheetLayout(sheetId, paper, sheetLabels(sheetId))) {
+  for (final p in primitives) {
     switch (p) {
       case SheetRect():
         g

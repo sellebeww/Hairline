@@ -14,6 +14,7 @@ class SitesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
         appBar: AppBar(title: const Text(Strings.sitesTitle), actions: [
+          IconButton(icon: const Icon(Icons.fact_check_outlined), tooltip: Strings.validationEntry, onPressed: () => context.push('/validation')),
           IconButton(icon: const Icon(Icons.help_outline), tooltip: Strings.menuHelp, onPressed: () => context.push('/help')),
           IconButton(icon: const Icon(Icons.info_outline), tooltip: Strings.menuAbout, onPressed: () => context.push('/about')),
         ]),

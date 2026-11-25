@@ -163,3 +163,9 @@ final trendProvider = FutureProvider.autoDispose.family<TrendData?, int>((ref, c
     currentVersion: version,
   );
 });
+
+/// Plate validation runs, newest first.
+final validationRunsProvider = FutureProvider.autoDispose<List<ValidationRun>>((ref) => ref.watch(hairlineRepositoryProvider).validationRuns());
+
+final validationRunProvider =
+    FutureProvider.autoDispose.family<ValidationRun?, int>((ref, id) => ref.watch(hairlineRepositoryProvider).validationRun(id));

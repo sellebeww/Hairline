@@ -14,6 +14,8 @@ import 'screens/point_page.dart';
 import 'screens/result_page.dart';
 import 'screens/sites_page.dart';
 import 'screens/trend_page.dart';
+import 'screens/validation_page.dart';
+import 'screens/validation_run_page.dart';
 
 part 'router.g.dart';
 
@@ -34,6 +36,8 @@ GoRouter router(Ref ref) => GoRouter(routes: [
       GoRoute(path: '/point/:crackId', builder: (context, state) => PointPage(crackId: _id(state, 'crackId'))),
       GoRoute(path: '/result/:visitId', builder: (context, state) => ResultPage(visitId: _id(state, 'visitId'))),
       GoRoute(path: '/trend/:crackId', builder: (context, state) => TrendPage(crackId: _id(state, 'crackId'))),
+      GoRoute(path: '/validation', builder: (context, state) => const ValidationPage()),
+      GoRoute(path: '/validation/run/:runId', builder: (context, state) => ValidationRunPage(runId: _id(state, 'runId'))),
       GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
       GoRoute(path: '/about', builder: (context, state) => const AboutPage()),
     ]);

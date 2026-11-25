@@ -5,11 +5,14 @@ import 'package:flutter/widgets.dart';
 import 'package:hairline_core/hairline_core.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../data/database.dart';
 import '../data/repository.dart';
 import '../l10n/strings.dart';
 import '../pipeline/frame_processor.dart';
 import '../pipeline/visit_processor.dart';
 import '../providers.dart';
+import '../validation/plate_validator.dart';
+import '../validation/validation_providers.dart';
 import 'camera_driver.dart';
 import 'camera_service.dart';
 import 'capture_flow.dart';
@@ -88,6 +91,9 @@ class CaptureController extends _$CaptureController {
   CancelToken? _cancel;
   CameraSetup? _setup;
   ReferencePose? _reference;
+  PlateSetup? _plate; // set in a plate validation (crack id [validationCaptureId])
+
+  bool get _validating => _crackId == validationCaptureId;
 
   @override
   CaptureUiState build(int crackId) {
@@ -123,6 +129,7 @@ class CaptureController extends _$CaptureController {
     // closed the ref is dead, while this method may still be running.
     if (!ref.mounted) return;
     final repo = ref.read(hairlineRepositoryProvider);
+    if (_validating) _plate = ref.read(validationSetupProvider);
     final GrayDetectorFactory detectorFactory;
     try {
       detectorFactory = ref.read(grayDetectorFactoryProvider);
@@ -132,8 +139,13 @@ class CaptureController extends _$CaptureController {
       return;
     }
     try {
-      final crack = await repo.crackContext(_crackId);
-      final visits = await repo.visitsOfCrack(_crackId);
+      final plate = _plate;
+      if (_validating && plate == null) {
+        _failStart(Strings.errStartup);
+        return;
+      }
+      final crack = _validating ? null : await repo.crackContext(_crackId);
+      final visits = _validating ? const <Visit>[] : await repo.visitsOfCrack(_crackId);
       final baseline = visits.where((v) => v.kind == 'baseline').firstOrNull;
       _reference = ReferencePose.tryParse(baseline?.referencePoseJson);
       final camera = _camera!;
@@ -141,9 +153,9 @@ class CaptureController extends _$CaptureController {
       _setup = setup;
       if (_disposed) return;
       _analyzer = LiveAnalyzer(
-            sheetId: crack.crack.sheetId,
-            printScale: crack.crack.printScale,
-            pointMm: Pt(crack.point.xMm, crack.point.yMm),
+            sheetId: crack?.crack.sheetId ?? plateSheetId,
+            printScale: crack?.crack.printScale ?? plate!.printScale,
+            pointMm: crack == null ? const Pt(0, 0) : Pt(crack.point.xMm, crack.point.yMm),
             quarterTurns: setup.quarterTurns,
             reference: _reference,
             focalMm: setup.lens.focalLengthMm,
@@ -161,8 +173,8 @@ class CaptureController extends _$CaptureController {
       if (_disposed) return;
       state = state.copyWith(
         starting: false,
-        isBaseline: baseline == null,
-        note: baseline != null && _reference == null ? Strings.referenceMissingHint : null,
+        isBaseline: !_validating && baseline == null,
+        note: _validating ? Strings.validationCaptureHint : (baseline != null && _reference == null ? Strings.referenceMissingHint : null),
       );
     } on CameraFailure catch (e) {
       _failStart(e.message);
@@ -193,6 +205,7 @@ class CaptureController extends _$CaptureController {
     }
     _dispatch(AnalysisEvent(analysis, _clock.elapsed));
     final incompatible = _reference != null && analysis != null && analysis.estimate != null && analysis.deviation == null;
+    if (_validating) return;
     final note = incompatible ? Strings.referenceIncompatibleHint : (state.isBaseline || _reference != null ? null : Strings.referenceMissingHint);
     if (!_disposed && note != state.note) state = state.copyWith(note: note);
   }
@@ -204,6 +217,7 @@ class CaptureController extends _$CaptureController {
     final analysis = flow.analysis;
     if (!flow.canShoot || camera == null || setup == null || analysis == null) return;
     final processor = ref.read(visitProcessorProvider);
+    final validator = ref.read(plateValidatorProvider);
     final pendings = ref.read(pendingBaselinesProvider.notifier);
     final baseline = state.isBaseline;
     // The reference of the baseline visit is the pose of the frame that made the shutter ready.
@@ -227,6 +241,26 @@ class CaptureController extends _$CaptureController {
     final cancel = _cancel = CancelToken();
     void progress(int done, int total) => _dispatch(ProcessProgressEvent(done, total));
     try {
+      if (_validating) {
+        final outcome = await validator.run(
+          photos: burst.photos,
+          setup: _plate!,
+          deviceModel: setup.lens.deviceModel,
+          // A simulated camera can never produce PERANGKAT data.
+          source: camera.isSimulated ? ValidationSource.sintetis : ValidationSource.perangkat,
+          camera: setup.lens.toCameraInfo(flags: burst.locks.flags),
+          cancel: cancel,
+          onProgress: progress,
+        );
+        if (_disposed) return;
+        switch (outcome) {
+          case PlateStored(:final runId):
+            _dispatch(ValidatedEvent(runId));
+          case PlateNotStored(:final reasons):
+            _fail(reasons.join(' '));
+        }
+        return;
+      }
       if (baseline) {
         // No measurement point exists yet: only the geometry is gated; the point is
         // chosen on the best photo next and the visit is stored from there.

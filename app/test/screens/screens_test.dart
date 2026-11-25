@@ -28,6 +28,10 @@ class _RecordingOutput implements SheetOutput {
   Future<void> print(int sheetId, PaperSize paper) async => calls.add('print $sheetId ${paper.label}');
   @override
   Future<void> share(int sheetId, PaperSize paper) async => calls.add('share $sheetId ${paper.label}');
+  @override
+  Future<void> printPlate(PaperSize paper) async => calls.add('printPlate ${paper.label}');
+  @override
+  Future<void> sharePlate(PaperSize paper) async => calls.add('sharePlate ${paper.label}');
 }
 
 class _FakeLocator extends PointLocator {

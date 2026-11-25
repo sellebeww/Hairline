@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/strings.dart';
 import '../pipeline/visit_processor.dart';
+import '../validation/validation_providers.dart';
 import 'capture_controller.dart';
 import 'capture_flow.dart';
 import 'capture_overlay.dart';
@@ -43,6 +44,8 @@ class _CapturePageState extends ConsumerState<CapturePage> with WidgetsBindingOb
 
   void _openPoint() => GoRouter.maybeOf(context)?.pushReplacement('/point/${widget.crackId}');
 
+  void _openValidation(int runId) => GoRouter.maybeOf(context)?.pushReplacement('/validation/run/$runId');
+
   void _openResult() {
     final outcome = ref.read(captureControllerProvider(widget.crackId)).flow.outcome;
     if (outcome is VisitStored) GoRouter.maybeOf(context)?.pushReplacement('/result/${outcome.visitId}');
@@ -53,6 +56,9 @@ class _CapturePageState extends ConsumerState<CapturePage> with WidgetsBindingOb
     // The baseline photos are kept in memory: go on to the measurement point at once.
     ref.listen(captureControllerProvider(widget.crackId).select((u) => u.flow.phase), (prev, next) {
       if (next == CapturePhase.baselineCaptured) _openPoint();
+    });
+    ref.listen(captureControllerProvider(widget.crackId).select((u) => u.flow.validationRunId), (prev, next) {
+      if (next != null) _openValidation(next);
     });
     final ui = ref.watch(captureControllerProvider(widget.crackId));
     final controller = ref.read(captureControllerProvider(widget.crackId).notifier);
@@ -65,7 +71,7 @@ class _CapturePageState extends ConsumerState<CapturePage> with WidgetsBindingOb
       canPop: !busy,
       child: Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(title: const Text(Strings.captureTitle)),
+        appBar: AppBar(title: Text(widget.crackId == validationCaptureId ? Strings.validationCaptureTitle : Strings.captureTitle)),
         body: SafeArea(
           child: Column(children: [
             Expanded(
@@ -129,6 +135,8 @@ class _BottomPanel extends StatelessWidget {
         children
           ..add(const _Note(Strings.baselineCapturedHint))
           ..add(FilledButton(onPressed: onChoosePoint, child: const Text(Strings.choosePoint)));
+      case CapturePhase.validated:
+        children.add(const _Note(Strings.statusValidated));
       case CapturePhase.result:
         children
           ..add(OutcomeSummary(outcome: s.outcome!, flags: s.flags))

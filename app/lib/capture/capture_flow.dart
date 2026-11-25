@@ -14,6 +14,9 @@ enum CapturePhase {
 
   /// Baseline only: the photos passed the geometry gate, the measurement point comes next.
   baselineCaptured,
+
+  /// Plate validation only: the run was stored, [CaptureState.validationRunId] says which.
+  validated,
   result,
   error,
 }
@@ -53,6 +56,7 @@ final class CaptureState {
     this.processDone = 0,
     this.processTotal = 0,
     this.outcome,
+    this.validationRunId,
     this.error,
     this.flags = const [],
   });
@@ -70,6 +74,9 @@ final class CaptureState {
 
   /// Set in [CapturePhase.result]: stored, or not stored with reasons.
   final VisitOutcome? outcome;
+
+  /// Set in [CapturePhase.validated].
+  final int? validationRunId;
 
   /// Set in [CapturePhase.error]: a specific message for the user.
   final String? error;
@@ -125,6 +132,12 @@ final class ProcessedEvent extends CaptureEvent {
 /// The baseline burst passed the geometry gate and waits in memory for the measurement point.
 final class BaselineGatedEvent extends CaptureEvent {
   const BaselineGatedEvent();
+}
+
+/// The plate validation run was stored.
+final class ValidatedEvent extends CaptureEvent {
+  const ValidatedEvent(this.runId);
+  final int runId;
 }
 
 final class FailedEvent extends CaptureEvent {
@@ -220,11 +233,14 @@ CaptureState reduceCapture(CaptureState s, CaptureEvent e, {FlowConfig config = 
         processDone: s.processTotal,
         processTotal: s.processTotal,
       );
+    case ValidatedEvent(:final runId):
+      if (s.phase != CapturePhase.processing) return s;
+      return CaptureState(phase: CapturePhase.validated, analysis: s.analysis, validationRunId: runId, flags: s.flags);
     case FailedEvent(:final message):
       if (s.phase == CapturePhase.error) return s;
       return CaptureState(phase: CapturePhase.error, analysis: s.analysis, error: message, flags: s.flags);
     case RetryEvent():
-      if (s.phase != CapturePhase.result && s.phase != CapturePhase.error && s.phase != CapturePhase.baselineCaptured) return s;
+      if (s.phase != CapturePhase.result && s.phase != CapturePhase.error && s.phase != CapturePhase.baselineCaptured && s.phase != CapturePhase.validated) return s;
       return const CaptureState();
   }
 }

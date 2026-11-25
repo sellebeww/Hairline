@@ -219,4 +219,19 @@ void main() {
       expect(reduceCapture(done, const RetryEvent()).phase, CapturePhase.waitingForMarkers);
     });
   });
+
+  group('plate validation phase', () {
+    test('a stored run ends processing in "validated" and keeps the run id; retry returns to aiming', () {
+      var s = const CaptureState(phase: CapturePhase.processing, processTotal: 6);
+      s = reduceCapture(s, const ValidatedEvent(7));
+      expect(s.phase, CapturePhase.validated);
+      expect(s.validationRunId, 7);
+      expect(reduceCapture(s, const RetryEvent()).phase, CapturePhase.waitingForMarkers);
+    });
+
+    test('a validated event outside processing is ignored', () {
+      const s = CaptureState(phase: CapturePhase.ready);
+      expect(identical(reduceCapture(s, const ValidatedEvent(1)), s), isTrue);
+    });
+  });
 }

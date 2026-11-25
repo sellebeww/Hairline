@@ -27,12 +27,15 @@ final class FrameProcessException implements Exception {
   String toString() => 'FrameProcessException: $message${detail == null ? '' : ' ($detail)'}';
 }
 
+/// Work done inside the worker on the photo bytes. A closure over sendable values only
+/// (a context, a list of points, a top-level factory).
+typedef _Work = Object Function(Uint8List photo);
+
 final class _Request {
-  const _Request(this.reply, this.photo, this.context, this.factory);
+  const _Request(this.reply, this.photo, this.work);
   final SendPort reply;
   final TransferableTypedData photo;
-  final FrameContext context;
-  final FramePortsFactory factory;
+  final _Work work;
 }
 
 final class _Failure {
@@ -48,7 +51,7 @@ void _worker(_Request r) {
   Object reply;
   try {
     final bytes = r.photo.materialize().asUint8List();
-    reply = processFrame(encoded: bytes, ports: r.factory(), context: r.context);
+    reply = r.work(bytes);
   } catch (e, st) {
     reply = _Failure('$e', '$st');
   }
@@ -59,20 +62,21 @@ void _worker(_Request r) {
   }
 }
 
-/// A running frame job.
-final class FrameJob {
+/// A running frame job; [T] is the result of the work: one [FrameOutcome] for a crack
+/// frame, one per measurement point for a plate frame.
+final class FrameJob<T extends Object> {
   FrameJob._(this._onFinished) {
     // A cancelled or dropped job (provider disposal) must not raise an unhandled error.
     _done.future.ignore();
   }
 
-  final void Function(FrameJob) _onFinished;
-  final _done = Completer<FrameOutcome>();
+  final void Function(FrameJob<Object>) _onFinished;
+  final _done = Completer<T>();
   Isolate? _isolate;
   bool _cancelled = false;
 
   /// Completes with the outcome, or with [FrameCancelledException] / [FrameProcessException].
-  Future<FrameOutcome> get result => _done.future;
+  Future<T> get result => _done.future;
 
   /// Cancels cooperatively: the caller gets [FrameCancelledException] at once and the
   /// result is dropped. The worker is killed with `beforeNextEvent`, i.e. only after its
@@ -86,7 +90,7 @@ final class FrameJob {
     _isolate?.kill(priority: Isolate.beforeNextEvent);
   }
 
-  Future<void> _start(Uint8List photo, FrameContext context, FramePortsFactory factory) async {
+  Future<void> _start(Uint8List photo, _Work work) async {
     final reply = ReceivePort(), exit = ReceivePort(), errors = ReceivePort();
     void fail(String m, [String? d]) {
       if (!_done.isCompleted) _done.completeError(FrameProcessException(m, d));
@@ -95,10 +99,10 @@ final class FrameJob {
     reply.listen((m) {
       if (_done.isCompleted) return;
       switch (m) {
-        case FrameOutcome():
-          _done.complete(m);
         case _Failure(:final error, :final stack):
           fail('Pemrosesan foto gagal. Ulangi pemotretan.', '$error\n$stack');
+        case T():
+          _done.complete(m);
         default:
           fail('Balasan pemrosesan tidak dikenal.');
       }
@@ -109,7 +113,7 @@ final class FrameJob {
       if (_cancelled) return;
       _isolate = await Isolate.spawn(
         _worker,
-        _Request(reply.sendPort, TransferableTypedData.fromList([photo]), context, factory),
+        _Request(reply.sendPort, TransferableTypedData.fromList([photo]), work),
         onExit: exit.sendPort,
         onError: errors.sendPort,
         errorsAreFatal: true,
@@ -132,15 +136,30 @@ final class FrameJob {
 class FrameProcessor {
   FrameProcessor(this._factory);
   final FramePortsFactory _factory;
-  final Set<FrameJob> _active = {};
+  final Set<FrameJob<Object>> _active = {};
 
   /// Number of jobs still running (tests, diagnostics).
   int get activeJobs => _active.length;
 
-  FrameJob start(Uint8List photo, FrameContext context) {
-    final job = FrameJob._(_active.remove);
+  FrameJob<FrameOutcome> start(Uint8List photo, FrameContext context) {
+    final factory = _factory; // a local: the closure must not capture `this` (it crosses isolates)
+    return _run<FrameOutcome>(photo, (bytes) => processFrame(encoded: bytes, ports: factory(), context: context));
+  }
+
+  /// One photo, several measurement [points] (the validation plate): a single decode and
+  /// detection in the worker, one outcome per point in order.
+  FrameJob<List<FrameOutcome>> startPoints(Uint8List photo, FrameContext context, List<FramePoint> points) {
+    final factory = _factory;
+    return _run<List<FrameOutcome>>(
+      photo,
+      (bytes) => processFramePoints(encoded: bytes, ports: factory(), context: context, points: points),
+    );
+  }
+
+  FrameJob<T> _run<T extends Object>(Uint8List photo, _Work work) {
+    final job = FrameJob<T>._(_active.remove);
     _active.add(job);
-    unawaited(job._start(photo, context, _factory));
+    unawaited(job._start(photo, work));
     return job;
   }
 

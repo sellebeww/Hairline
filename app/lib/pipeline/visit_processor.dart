@@ -190,10 +190,12 @@ class VisitProcessor {
         sensorLongSideMm: camera.sensorLongSideMm,
       );
 
-  static VisitResult _aggregate(List<FrameOutcome> outcomes, CrackContext c) => aggregateVisit(
+  /// `u_dev` comes from the latest PERANGKAT plate run of this phone model, if it validated
+  /// the phone; otherwise the unvalidated default stays and the result says BELUM_DIVALIDASI.
+  static VisitResult _aggregate(List<FrameOutcome> outcomes, CrackContext c, StoredValidation? validation) => aggregateVisitWithDevice(
         [for (final o in outcomes) o.input],
-        // u_dev stays the unvalidated default until a device validation exists (Phase 7).
         options: UncertaintyOptions(dzMm: c.crack.reliefMm, uPrintRel: c.crack.printScaleURel),
+        validation: validation?.validation,
       );
 
   /// Processes the [photos] of one burst for [crackId]. Stores the visit only when the
@@ -211,7 +213,8 @@ class VisitProcessor {
   }) async {
     final crack = await repository.crackContext(crackId);
     final outcomes = await _processAll(photos, _context(crack, camera), cancel, onProgress);
-    final result = _aggregate(outcomes, crack);
+    final validation = await repository.latestDeviceValidation(deviceModel);
+    final result = _aggregate(outcomes, crack, validation);
     if (!result.storable) {
       return VisitNotStored(result: result, frames: outcomes, reasons: _reasons(result, outcomes, photos.length));
     }
@@ -233,7 +236,7 @@ class VisitProcessor {
         referencePoseJson: referencePoseJson,
         algorithmVersion: algorithmVersion,
         frames: [for (var n = 0; n < kept.length; n++) _frameDraft(outcomes[kept[n]], files[n])],
-        aggregate: _aggregateDraft(result, algorithmVersion),
+        aggregate: _aggregateDraft(result, algorithmVersion, validation),
       ));
       return VisitStored(result: result, frames: outcomes, visitId: visitId);
     } catch (_) {
@@ -266,7 +269,7 @@ class VisitProcessor {
         if (outcomes[i].accepted || outcomes[i].input.measureRejection == RejectReason.crackNotFound) i,
     ];
     if (ok.length < QualityThresholds.standard.minAcceptedFrames) {
-      final result = _aggregate(outcomes, crack);
+      final result = _aggregate(outcomes, crack, null);
       return BaselineGateClosed(VisitNotStored(result: result, frames: outcomes, reasons: _reasons(result, outcomes, photos.length)));
     }
     var best = ok.first;
@@ -320,14 +323,15 @@ class VisitProcessor {
       photos.add(await storage.read(f.path));
     }
     final outcomes = await _processAll(photos, _context(crack, camera ?? const CameraInfo()), cancel);
-    final result = _aggregate(outcomes, crack);
+    final validation = await repository.latestDeviceValidation(visit.deviceModel);
+    final result = _aggregate(outcomes, crack, validation);
     if (!result.storable) {
       return VisitNotStored(result: result, frames: outcomes, reasons: _reasons(result, outcomes, photos.length));
     }
     await repository.addReprocessedMeasurements(
       visitId: visitId,
       algorithmVersion: algorithmVersion,
-      aggregate: _aggregateDraft(result, algorithmVersion),
+      aggregate: _aggregateDraft(result, algorithmVersion, validation),
       perFrame: {
         for (var i = 0; i < outcomes.length; i++)
           if (outcomes[i].accepted) stored[i].id: _frameMeasurementDraft(outcomes[i]),
@@ -382,7 +386,7 @@ class VisitProcessor {
     );
   }
 
-  static MeasurementDraft _aggregateDraft(VisitResult r, String version) {
+  static MeasurementDraft _aggregateDraft(VisitResult r, String version, StoredValidation? validation) {
     final b = r.budget;
     final numeric = r.status == VisitStatus.terukur && b != null;
     return MeasurementDraft(
@@ -397,6 +401,8 @@ class VisitProcessor {
         'algorithm_version': version,
         'budget': b?.toJson(),
         'issue': r.issue?.code,
+        // The plate run that set u_dev (null: the unvalidated default was used).
+        'validation_run_id': b != null && !b.belumDivalidasi ? validation?.id : null,
         'accepted_frames': r.acceptedFrames,
         'excluded_unmeasurable_frames': r.excludedUnmeasurableFrames,
         'frame_rejections': [for (final x in r.frameRejections) {'frame': x.frame, 'code': x.code}],

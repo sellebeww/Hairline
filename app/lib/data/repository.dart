@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Vassel Goleyu. MIT License.
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:hairline_core/hairline_core.dart';
 
@@ -73,6 +75,23 @@ final class VisitDraft {
   final String? referencePoseJson;
   final List<FrameDraft> frames;
   final MeasurementDraft aggregate;
+}
+
+/// Where a plate run's photos came from. Only `perangkat` runs ever change `u_dev`.
+enum ValidationSource {
+  perangkat('PERANGKAT'),
+  sintetis('SINTETIS');
+
+  const ValidationSource(this.code);
+  final String code;
+}
+
+/// A device validation read back for the budget of later visits.
+final class StoredValidation {
+  const StoredValidation({required this.id, required this.tsUtc, required this.validation});
+  final int id;
+  final DateTime tsUtc;
+  final DeviceValidation validation;
 }
 
 /// A crack with its single measurement point.
@@ -283,4 +302,56 @@ class HairlineRepository {
         if (used.isNotEmpty) throw const RepositoryException('Frame ini dipakai oleh pengukuran dan tidak dapat dihapus.');
         await (_db.delete(_db.frames)..where((f) => f.id.equals(frameId))).go();
       });
+
+  /// Stores a plate run (`validation_runs`, 5.7). [resultsJson] is `PlateEvaluation.toJson`,
+  /// [plateTruthJson] the truth and the print scale used.
+  Future<int> saveValidationRun({
+    required String deviceModel,
+    required DateTime tsUtc,
+    required String plateTruthJson,
+    required String resultsJson,
+    required double biasMm,
+    required double rmseMm,
+    required double coverage,
+    required String algorithmVersion,
+    required ValidationSource source,
+  }) {
+    if (!tsUtc.isUtc) throw ArgumentError.value(tsUtc, 'tsUtc', 'must be UTC');
+    return _db.into(_db.validationRuns).insert(ValidationRunsCompanion.insert(
+          deviceModel: deviceModel,
+          tsUtc: tsUtc,
+          plateTruthJson: plateTruthJson,
+          resultsJson: resultsJson,
+          biasMm: biasMm,
+          rmseMm: rmseMm,
+          coverage: coverage,
+          algorithmVersion: algorithmVersion,
+          source: source.code,
+        ));
+  }
+
+  /// All runs, newest first.
+  Future<List<ValidationRun>> validationRuns() =>
+      (_db.select(_db.validationRuns)..orderBy([(r) => OrderingTerm.desc(r.tsUtc), (r) => OrderingTerm.desc(r.id)])).get();
+
+  Future<ValidationRun?> validationRun(int id) => (_db.select(_db.validationRuns)..where((r) => r.id.equals(id))).getSingleOrNull();
+
+  /// The latest `PERANGKAT` run of [deviceModel] (the one that sets `u_dev`), or null.
+  /// `SINTETIS` runs are never returned. A stored run that cannot be read is skipped
+  /// (the unvalidated default then applies: the safe direction).
+  Future<StoredValidation?> latestDeviceValidation(String deviceModel) async {
+    final rows = await (_db.select(_db.validationRuns)
+          ..where((r) => r.deviceModel.equals(deviceModel) & r.source.equals(ValidationSource.perangkat.code))
+          ..orderBy([(r) => OrderingTerm.desc(r.tsUtc), (r) => OrderingTerm.desc(r.id)])
+          ..limit(1))
+        .get();
+    if (rows.isEmpty) return null;
+    try {
+      final json = jsonDecode(rows.single.resultsJson);
+      if (json is! Map<String, Object?>) return null;
+      return StoredValidation(id: rows.single.id, tsUtc: rows.single.tsUtc.toUtc(), validation: DeviceValidation.fromResultsJson(json));
+    } on Object {
+      return null;
+    }
+  }
 }

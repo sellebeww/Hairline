@@ -24,6 +24,9 @@ final class FakeCameraService implements CameraService {
     this.initializeFailure,
   });
 
+  @override
+  bool get isSimulated => true;
+
   final List<LumaFrame> frames;
   final List<Uint8List> stills;
   final Duration frameInterval;

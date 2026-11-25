@@ -25,6 +25,7 @@ abstract final class Strings {
   static const openResult = 'Lihat hasil';
   static const statusResultStored = 'Kunjungan tersimpan';
   static const statusResultRejected = 'Foto belum memenuhi syarat, tidak disimpan';
+  static const statusValidated = 'Validasi tersimpan';
   static const statusError = 'Terjadi masalah';
   static const waitingHint = 'Arahkan kamera ke lembar bingkai sampai minimal tiga penanda terlihat utuh.';
 
@@ -361,6 +362,77 @@ abstract final class Strings {
   static const aboutLicense = 'Lisensi MIT. Hak cipta (c) 2026 Vassel Goleyu.';
   static const aboutPrivacy = 'Semua data tersimpan di ponsel ini. Versi rilis tidak memakai internet dan hanya meminta izin kamera.';
   static const aboutThirdParty = 'Lisensi paket pihak ketiga';
+
+  // Plate validation (phase 8).
+  static const validationEntry = 'Validasi ponsel dengan pelat';
+  static const validationTitle = 'Validasi dengan pelat kalibrasi';
+  static const validationIntro =
+      'Cetak pelat validasi, ukur batang skalanya, lalu foto pelat dengan alur yang sama seperti retak. Aplikasi mengukur 32 garis hitam berlebar tertentu '
+      'dan membandingkannya dengan lebar sebenarnya. Hasilnya hanya berlaku untuk ponsel ini, jarak, dan pencahayaan saat uji.';
+  static const validationPlateSection = '1. Cetak pelat';
+  static const validationPlateBody =
+      'Cetak 100 persen tanpa "Fit to page", jangan dipotong, tempel rata pada permukaan keras. Lebar garis tercetak berbeda dari nominal (toner atau tinta menyebar), '
+      'jadi lebar sebenarnya sebaiknya diukur dengan pemindai flatbed minimal 2400 dpi (lihat tools/measure_scan.dart) atau lup bertakar.';
+  static const printPlate = 'Cetak pelat';
+  static const sharePlate = 'Bagikan PDF pelat';
+  static const validationScaleSection = '2. Ukur batang skala';
+  static const validationTruthSection = '3. Lebar sebenarnya garis';
+  static const truthNominal = 'NOMINAL (tidak dikarakterisasi)';
+  static const truthNominalBody =
+      'Memakai lebar nominal dengan ketidakpastian awal di bawah. Ini nilai awal, bukan hasil ukur. Hasil dengan kebenaran nominal disimpan tetapi tidak pernah dianggap sebagai validasi.';
+  static const truthCsv = 'Impor CSV hasil karakterisasi';
+  static const truthCsvBody = 'Tempel isi berkas CSV dengan baris pertama persis: posisi,lebar_mm,u_mm. Contoh baris: V1-3,0.331,0.008 (titik desimal).';
+  static const truthCsvField = 'Isi CSV';
+  static const truthCsvPaste = 'Tempel dari papan klip';
+  static const uTruthField = 'u_truth awal (mm)';
+  static const errUTruth = 'Masukkan angka antara 0 dan 1 mm, misalnya 0,05.';
+  static const errCsvEmpty = 'Tempel isi CSV terlebih dahulu.';
+  static const validationStart = 'Mulai validasi';
+  static const validationRunsTitle = 'Validasi sebelumnya';
+  static const validationNoRuns = 'Belum ada validasi.';
+  static const validationCaptureTitle = 'Foto pelat validasi';
+  static const validationCaptureHint = 'Arahkan kamera ke pelat validasi (lembar 11). Alur sama seperti retak: ikuti panduan dan tahan ponsel diam.';
+  static const validationResultTitle = 'Hasil validasi';
+  static const sourcePerangkat = 'PERANGKAT';
+  static const sourceSintetis = 'SINTETIS';
+  static const sourceSintetisNote = 'SINTETIS: dari foto simulasi, bukan dari ponsel. Tidak mengubah ketidakpastian pengukuran retak mana pun.';
+  static const sourcePerangkatNote = 'PERANGKAT: dari foto pelat yang diambil ponsel ini.';
+  static const verdictValidated =
+      'Memenuhi ambang validasi. Ketidakpastian perangkat (u_dev) untuk ponsel ini kini diturunkan dari bias yang terukur, dan label BELUM_DIVALIDASI tidak lagi tampil pada pengukuran baru.';
+  static const verdictNotValidated =
+      'Belum memenuhi ambang validasi. Label BELUM_DIVALIDASI tetap tampil dan u_dev tetap nilai awal yang konservatif.';
+  static const validationScope =
+      'Angka di bawah hanya berlaku untuk ponsel ini, jarak dan pencahayaan saat uji, dan kebenaran dasar yang dipakai. Cakupan dihitung pada data yang sama dengan penurunan u_dev, jadi cenderung optimistis.';
+  static String validationTruthSource(bool characterized) => characterized ? 'Kebenaran dasar: KARAKTERISASI (CSV)' : 'Kebenaran dasar: $truthNominal';
+  static String validationOverall(int reported, int n, String bias, String rmse, String coverage) =>
+      'Garis terukur $reported dari $n. Bias $bias mm, RMSE $rmse mm, cakupan $coverage.';
+  static String validationLowerLimit(String mm) => 'Batas pelaporan bawah empiris: $mm mm (lebar terkecil yang terukur andal bersama semua lebar di atasnya).';
+  static const validationNoLowerLimit = 'Batas pelaporan bawah empiris: belum ada lebar yang terukur andal.';
+  static const validationGroupsTitle = 'Galat per lebar';
+  static String validationGroupRow(String truth, int reported, int n, String bias, String rmse, String coverage) =>
+      'Lebar $truth mm: terukur $reported dari $n, bias $bias mm, RMSE $rmse mm, cakupan $coverage';
+  static const validationLinesTitle = 'Semua garis';
+  static String validationLineRow(String id, String truth, String measured, String status) => '$id (sebenarnya $truth mm): $measured, $status';
+  static const validationRecommendTitle = 'Saran';
+  static const recCloser = 'Dekatkan ponsel sampai penanda mengisi layar: skala mm per piksel lebih kecil membuat garis sempit terukur.';
+  static const recLight = 'Pakai cahaya merata tanpa silau dan tanpa bayangan pada pelat.';
+  static const recSteady = 'Tahan ponsel lebih diam atau sandarkan pada permukaan: foto buram ditolak.';
+  static const recUseCsv = 'Karakterisasi lebar garis dengan pemindai flatbed atau lup, impor CSV-nya, lalu ulangi validasi.';
+  static const recRepeat = 'Ulangi validasi bila kondisi pengukuran retak (jarak, cahaya) berbeda dari kondisi uji ini.';
+  static const validationNotStoredTitle = 'Validasi tidak disimpan';
+  static const validationOpenResult = 'Lihat hasil validasi';
+  static String validationRunTitle(String when, String model) => '$when, $model';
+  static String validationRunSubtitle(String source, String truth, bool validated) =>
+      '$source, $truth${validated ? ', memenuhi ambang' : ', belum memenuhi ambang'}';
+  static String validationDevResult(String mm) => 'u_dev untuk lebar sebanding dengan hasil ini: sekitar $mm mm.';
+  static const printPlateTitleLabel = 'PELAT VALIDASI';
+  static const plateCutHint = 'Pelat kalibrasi: jangan dipotong';
+  static const plateLegend = [
+    'Nomor garis: 1 = 0,1 mm   2 = 0,2 mm   3 = 0,3 mm   4 = 0,5 mm',
+    '5 = 0,8 mm   6 = 1,0 mm   7 = 1,5 mm   8 = 2,0 mm (nominal)',
+    'V1, V2: garis tegak. H1, H2: garis mendatar.',
+    'Lebar tercetak berbeda dari nominal: karakterisasi dahulu.',
+  ];
 
   // Debug.
   static const fakePreview = 'Simulasi kamera (tanpa kamera nyata)';

@@ -20,6 +20,9 @@ enum _Status { idle, open, paused, disposed }
 /// still and restarted after the last, and a stream callback from an old generation is
 /// ignored; (4) at most one burst at a time.
 final class DeviceCameraService implements CameraService {
+  @override
+  bool get isSimulated => false;
+
   DeviceCameraService({
     required this._driverFactory,
     required this._lensSource,

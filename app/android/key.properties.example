@@ -1,0 +1,7 @@
+# Copy to key.properties (git-ignored) and fill in. Create a keystore once with:
+#   keytool -genkey -v -keystore ~/hairline-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias hairline
+# Never commit the keystore or key.properties.
+storeFile=/absolute/path/to/hairline-upload.jks
+storePassword=CHANGE_ME
+keyAlias=hairline
+keyPassword=CHANGE_ME
