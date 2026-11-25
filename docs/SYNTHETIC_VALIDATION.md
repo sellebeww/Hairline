@@ -1,6 +1,6 @@
 # Validasi sintetis (SINTETIS)
 
-Label: **SINTETIS**. Semua angka di dokumen ini dihasilkan oleh `packages/hairline_core/tool/run_synthetic_study.dart` (seed tetap 20261117, algoritma `p3-1`, core `0.3.0`). Tidak ada ponsel, kamera, atau pelat cetak nyata. Hasil membuktikan perilaku pada simulasi saja; akurasi dan cakupan pada perangkat nyata BELUM terbukti (butuh validasi pelat `PERANGKAT`).
+Label: **SINTETIS**. Semua angka di dokumen ini dihasilkan oleh `packages/hairline_core/tool/run_synthetic_study.dart` (seed tetap 20261117, algoritma `p3-1`, core `0.5.0`). Tidak ada ponsel, kamera, atau pelat cetak nyata. Hasil membuktikan perilaku pada simulasi saja; akurasi dan cakupan pada perangkat nyata BELUM terbukti (butuh validasi pelat `PERANGKAT`).
 
 ## 1. Desain studi
 
@@ -37,7 +37,7 @@ Kriteria: cakupan fit gabungan >= 90 persen DAN tidak ada kondisi yang secara st
 
 ## 3. Cakupan sebelum dan sesudah kalibrasi
 
-Per lebar, semua kondisi lain dipool (kunjungan TERUKUR). Sebelum: `rho = 1`. Sesudah: `rho = 1.0`. Kolom "pada U/2" mengukur kekonservatifan: bila cakupan fit pada setengah lebar interval masih tinggi, interval lebih dari dua kali lebih lebar daripada yang dibutuhkan (aman tetapi mengurangi daya deteksi tren).
+Per lebar, semua kondisi lain dipool (kunjungan TERUKUR). Sebelum: `rho = 1`. Sesudah: `rho = 1.0`. Kolom "pada U/2" mengukur kekonservatifan: bila cakupan fit pada setengah lebar interval masih tinggi, interval lebih dari dua kali lebih lebar daripada yang dibutuhkan (konservatif, tetapi mengurangi daya deteksi tren).
 
 | lebar (mm) | TERUKUR | fit sebelum (%) | fit sesudah (%) | fit ketat sebelum (%) | fit ketat sesudah (%) | fit sesudah pada U/2 (%) | acak sebelum (%) | acak sesudah (%) | bawaan sebelum (%) | bawaan sesudah (%) |
 |---|---|---|---|---|---|---|---|---|---|---|

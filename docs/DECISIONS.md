@@ -22,7 +22,7 @@ Format: tanggal, masalah, keputusan, alasan. Semua tanggal 2026-11-17 (Fase 1).
 
 ## D5. Format JSON homografi
 - Keputusan: `{"v":1,"dir":"sheet_to_image","h":[h11,h12,h13,h21,h22,h23,h31,h32,h33],"image":{"w":int,"h":int}}`, urut baris, `h33 = 1`, double penuh, satuan sheet mm. `H_inv` selalu dihitung ulang, tidak disimpan. Field `v` untuk migrasi.
-- Alasan: cocok dengan kolom `frames.homography_json` (5.7), aman untuk pemrosesan ulang oleh `algorithm_version` baru.
+- Alasan: cocok dengan kolom `frames.homography_json` (5.7), mendukung pemrosesan ulang oleh `algorithm_version` baru.
 
 ## D6. sqlite3_flutter_libs tidak dipakai
 - Masalah: CLAUDE.md meminta `sqlite3_flutter_libs`, tetapi versi terbaru `0.6.0+eol` ditandai end-of-life oleh pembuatnya (sqlite3 3.x membundel SQLite lewat build hook).
@@ -226,7 +226,7 @@ Format: tanggal, masalah, keputusan, alasan. Semua tanggal 2026-11-17 (Fase 1).
 ## D45. Fase 7: layar, data, dan keputusan kecil
 - Pembacaan data layar memakai `FutureProvider.autoDispose` tulisan tangan (`screens/queries.dart`) karena `riverpod_generator` tidak dapat me-resolve kelas baris Drift (dihasilkan di langkah lain build_runner). Ref tidak dipakai setelah `await`.
 - Hasil tiap kunjungan: agregat versi algoritma saat ini bila ada, selain itu yang terbaru. Tren memberi peringatan `ALGORITHM_VERSION_DIFFERS` bila versi berbeda dan tombol "proses ulang" bagi kunjungan tanpa versi saat ini; hasil lama tidak dihapus.
-- Label `BELUM_DIVALIDASI` selalu tampil bila tidak ada tanda `belum_divalidasi=false` di anggaran (default aman); saat ini tidak ada jalur validasi PERANGKAT, jadi selalu tampil.
+- Label `BELUM_DIVALIDASI` selalu tampil bila tidak ada tanda `belum_divalidasi=false` di anggaran (default konservatif); saat ini tidak ada jalur validasi PERANGKAT, jadi selalu tampil.
 - Grafik: sumbu x sebanding waktu, batang `w +- U`, bentuk penanda berbeda per klasifikasi (bukan hanya warna); kunjungan tanpa angka diberi silang di sumbu. Tanpa regresi atau ekstrapolasi.
 - Tidak ada paket baru. Versi aplikasi `1.0.0` dijaga sama dengan pubspec oleh tes.
 - Layar sesuai daftar Fase 7; tidak ada layar validasi pelat (Fase berikutnya).
@@ -245,3 +245,31 @@ Format: tanggal, masalah, keputusan, alasan. Semua tanggal 2026-11-17 (Fase 1).
 ## D47. Fase 8: build rilis Android
 - Rilis: R8 (`isMinifyEnabled`, `isShrinkResources`) eksplisit; penandatanganan dari `android/key.properties` (git-ignored, contoh di `key.properties.example`); bila tidak ada, ditandatangani dengan kunci debug (cukup untuk uji, TIDAK untuk dibagikan). Tidak ada keystore atau kredensial di repo. Hasil build, ukuran, dan manifest dicatat di PROGRESS.
 - `FrameJob` kini generik (`FrameJob<T>`): satu mekanisme isolate untuk satu frame (`FrameOutcome`) dan banyak titik (`List<FrameOutcome>`); pekerjaan dikirim sebagai closure yang hanya menangkap nilai yang dapat dikirim.
+
+## D48. Fase 9: build perangkat dengan OpenCV tanpa merusak tes host (2026-11-25)
+- Masalah: `app/` tidak bergantung pada `hairline_opencv` (D34), sehingga APK dari pohon ini tidak dapat mendeteksi penanda. Menambahkan dependensi langsung membuat setiap `flutter test` membangun OpenCV native untuk host (dartcv4 mengompilasi dari sumber; tanpa Xcode penuh gagal, B1; dengan Xcode pun puluhan menit).
+- Keputusan: `main.dart` dipecah menjadi `main()` dan `runHairline({overrides})`; `lib/main_device.dart` memanggilnya dengan `openCvPorts` dan `openCvGrayDetector`; `tools/build_device_apk.sh` (`make apk-device`) menambahkan dependensi `hairline_opencv` dan blok `hooks.user_defines.dartcv4` ke `app/pubspec.yaml` selama build lalu memulihkan `pubspec.yaml` dan `pubspec.lock` (`trap`). `main_device.dart` dikecualikan dari `flutter analyze` karena mengimpor paket yang tidak ada di pohon.
+- Alasan: satu-satunya cara agar verifikasi host tetap bersih dan APK perangkat tetap dapat dibangun dari repo yang sama tanpa restrukturisasi besar (memindah seluruh kode app ke paket lain) di fase audit.
+- Konsekuensi jujur: `main_device.dart` hanya dikompilasi oleh skrip build; build arm64 terbukti terbangun (hasil di PROGRESS), perilaku deteksi di kamera nyata tetap SELESAI-PERLU-UJI-PERANGKAT.
+
+## D49. Fase 9: peringatan pengukuran per frame sampai ke pengguna, deteksi lembar bergeser (2026-11-25)
+- Masalah (audit): `MODEL_MISFIT`, `PARAMETER_AT_BOUND`, `WIDTH_BEYOND_VALIDATED`, `FEW_PSF_EDGES` hanya disimpan di JSON per frame dan tidak pernah tampil. Lembar yang bergeser antar kunjungan tidak ditandai walau `trackingOffsetMm` dicatat.
+- Keputusan: peringatan baru `TRACKING_OFFSET` bila punggung retak lebih dari `maxTrackingOffsetMm = 0,5 mm` dari titik tersimpan (nilai awal, belum dituning di perangkat; studi sintetis menyebar retak +-0,3 mm dari titik tersimpan sehingga tidak memicu). Agregat kunjungan menyimpan `frame_warnings` (kode ke jumlah frame yang dipakai) di `components_json`; layar hasil menampilkan tiap peringatan dengan jumlah foto, dan untuk `TRACKING_OFFSET` menyebut bahwa seri mungkin terputus.
+- `measurementAlgorithmVersion` TIDAK dinaikkan: angka lebar dan ketidakpastian tidak berubah, hanya peringatan tambahan (kunci JSON baru bersifat aditif; baris lama tanpa kunci menampilkan tidak ada peringatan). Ketidakpastian tidak dinaikkan oleh peringatan ini karena pergeseran sepanjang retak tidak dapat dikuantifikasi; yang dilakukan adalah memberi tahu pengguna.
+
+## D50. Fase 9: faktor cakupan `k` tetap memakai tabel dengan interpolasi 1/dof (2026-11-25)
+- Temuan (dibandingkan dengan `scipy.stats.t.ppf(0.975, dof)`): komentar `coverageFactor` mengklaim galat < 0,001; sebenarnya interpolasi linier dalam 1/dof selalu di atas kuantil sebenarnya (busur dari fungsi konveks) dan melebihinya sampai 0,059 untuk dof 2 sampai 3, 0,011 untuk dof 3 sampai 5, 0,0013 untuk 5 sampai 10, di bawah 0,001 sesudahnya. Satu kunjungan selalu punya dof >= n-1 >= 2.
+- Keputusan: kode tidak diubah (selalu konservatif, tidak pernah di bawah kebenaran); dokumentasi dikoreksi dan dua tes penjaga terhadap nilai scipy ditambahkan. Mengganti dengan pendekatan lebih halus hanya menukar sedikit lebar interval (maks 1,7 persen dari `k`) dengan kompleksitas.
+
+## D51. Fase 9: cadangan data Android dimatikan (2026-11-25)
+- Temuan: manifest tidak menyatakan `allowBackup`; bawaan Android (true) mengirim basis data dan foto privat ke Cadangan Google dan memungkinkan `adb backup`, bertentangan dengan 5.8 (semua data lokal, ekspor hanya lewat aksi pengguna).
+- Keputusan: `android:allowBackup="false"` dan `dataExtractionRules` yang mengecualikan semua domain dari cadangan awan dan transfer perangkat; label aplikasi menjadi "Hairline". Tes `app/test/android_manifest_test.dart` menjaga izin (hanya `CAMERA`, tanpa `INTERNET` di manifest utama) dan aturan cadangan.
+
+## D52. Fase 9: perbaikan kecil dari audit (2026-11-25)
+- Segmen 4 mm di overlay layar titik ukur tidak lagi dikalikan `print_scale` sekali lagi: homografi sudah memakai milimeter fisik (`markerCornersMm(printScale)`), jadi segmen 4 mm fisik adalah +-2 mm di koordinat lembar. Jendela dan zona ukur tetap dikalikan karena itu ukuran cetak.
+- Adapter OpenCV tidak lagi membuang diam-diam id penanda ganda (dua salinan lembar atau positif palsu): diteruskan ke core yang menolak frame dengan `InvalidDetectionException` (sebelumnya penanda pertama dipercaya).
+- Kata yang menyiratkan keselamatan, dipakai secara teknis di dokumen (dua dokumen, empat tempat), diganti ("konservatif", "dapat diabaikan", "mendukung"); `tools/audit/doc_checks.py` menjaga em dash, kata terlarang, dan label SINTETIS/PERANGKAT pada angka mirip akurasi.
+- `make verify` memakai `build_runner build --delete-conflicting-outputs` seperti kontrak CLAUDE.md aturan 5.
+
+## D53. Fase 9: perangkat audit (2026-11-25)
+- `tools/audit/independent_check.py` (numpy/scipy, opsional `opencv-contrib-python-headless`) membangkitkan kasus berbenih tetap (20261125) dari spesifikasi tanpa membaca kode core, `packages/hairline_core/tool/audit_dump.dart` menjalankan core pada kasus yang sama, skrip membandingkan: homografi (DLT + LM independen), `rms_px`, `loo_mm`, `mm_per_px` dan anisotropi (Jacobian analitik), tilt, anggaran 5.5, `u_delta`, `k` (scipy), dan profil (penyesuaian scipy pada profil spline vs core). Penanda ArUco nyata dari OpenCV pada rotasi dalam bidang 0, 90, 180, 270, 45, 200 derajat memeriksa urutan sudut. Dijalankan lewat `make audit-numeric` (butuh venv di luar repo dengan paket di atas).

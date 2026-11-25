@@ -18,3 +18,20 @@
 ### Pembaruan B1 (Fase 6, 2026-11-25)
 - `OpenCvGrayMarkerDetector` (deteksi live dari buffer abu-abu) dan tesnya (`packages/hairline_opencv/test/opencv_adapters_test.dart`, tes baru "the live detector ...") ditulis, `flutter analyze` bersih, BELUM dijalankan: akar masalah sama (build native OpenCV tidak jalan di host tanpa Xcode penuh).
 - Dampak Fase 6: tanpa dependensi `hairline_opencv` di `app/`, layar pengambilan nyata tidak dapat mendeteksi penanda (menampilkan "Detektor penanda belum tersedia"). Alur ujung ke ujung terbukti hanya dengan `FakeCameraService` dan penanda tertanam (SINTETIS). Menyambungkan: dependensi di `app/pubspec.yaml`, dua override di `main.dart` (`openCvPorts`, `openCvGrayDetector`), lalu DEVICE_TEST.
+
+### Pembaruan B1 (Fase 9, 2026-11-25)
+- Akar masalah tidak berubah: host ini hanya punya Command Line Tools, tidak ada Xcode penuh. `dartcv4` mengompilasi OpenCV dari sumber pada setiap build target (host untuk `flutter test`, Android untuk APK).
+- Penyambungan ke aplikasi diselesaikan tanpa menunggu Xcode (DECISIONS D48): `lib/main_device.dart` + `tools/build_device_apk.sh` (`make apk-device`) membangun APK perangkat dengan `hairline_opencv` dan hook `dartcv4`; `app/` yang tercatat di git tetap tanpa dependensi itu sehingga `make verify` dan CI app tetap berjalan. Hasil build arm64 dicatat di PROGRESS.
+- Yang tetap TIDAK terbukti: tes `packages/hairline_opencv/test/opencv_adapters_test.dart` (ditulis, belum dijalankan; job CI `opencv` Linux `continue-on-error` belum dilihat hijau) dan perilaku `opencv_dart` di perangkat. Pengganti parsial: detektor ArUco OpenCV Python (5.0.0, perilaku referensi, BUKAN `opencv_dart`) pada rotasi 0, 90, 180, 270, 45 dan 200 derajat menghasilkan urutan sudut yang cocok dengan core (`make audit-numeric`, docs/AUDIT.md).
+
+## B2. Butir yang hanya dapat dibuktikan di perangkat nyata (Fase 9, 2026-11-25)
+Semua butir ini ditulis, diuji di host dengan data sintetis atau pengganti, dan diberi status `SELESAI-PERLU-UJI-PERANGKAT`. Alasan setiap butir: agent tidak punya ponsel, kamera, printer, pemindai, atau lembar cetak. Langkah uji ada di docs/DEVICE_TEST.md.
+1. Deteksi penanda `opencv_dart` pada foto dan stream nyata, dan tes adapter (B1): butuh perangkat Android atau host Linux/Xcode.
+2. Fokus dan eksposur terkunci benar-benar bertahan selama burst, orientasi bingkai CameraX (D41), penyelarasan overlay, kinerja stream, panas: butuh kamera nyata (DEVICE_TEST 2 sampai 6).
+3. Kanal Kotlin `LensInfoChannel` dan kecocokan id kamera `camera` dengan `CameraManager`: hanya terkompilasi (DEVICE_TEST 5).
+4. Cetak 100 persen dan skala nyata, deteksi foto cetak, bayangan ISP pada profil retak berkontras rendah (5.3a catatan): butuh printer dan ponsel (DEVICE_TEST 10).
+5. Validasi pelat (`PERANGKAT`): bias, RMSE, cakupan, `u_dev` nyata dan lebar terkecil yang terukur andal: butuh pelat cetak, pemindai atau lup, ponsel (DEVICE_TEST 11). Tanpa ini setiap hasil tetap `BELUM_DIVALIDASI`.
+6. Ambang awal yang belum dituning di perangkat: `QualityThresholds`, stabilitas live (5 frame, selisih antar frame), `maxTrackingOffsetMm` 0,5 mm, ambang validasi 16 garis, 4 lebar, cakupan 0,9.
+7. TalkBack, huruf besar sistem, kontras di layar nyata dan di bawah matahari (DEVICE_TEST 10).
+8. Perilaku R8 pada APK rilis di perangkat, penandatanganan dengan kunci pemilik (DEVICE_TEST 12).
+9. Uji kunjungan nyata dua minggu: konsistensi pose kunjungan ulang, ketahanan lembar tempel, tren pada retak nyata (DEVICE_TEST 14).

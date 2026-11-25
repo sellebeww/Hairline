@@ -6,10 +6,10 @@ Longitudinal crack-width monitoring for non-professionals, Android first (Flutte
 
 - Results are INDICATIVE and do not replace inspection by a structural engineer. The app does not assess building safety and never shows the words "safe" or "harmless". If a crack appears to widen, lengthen, or a new crack appears, contact an engineer or the authorities.
 - "No change detected" means any change is smaller than the measurement uncertainty. It is not proof that the crack did not change.
-- Accuracy numbers carry their origin: `SYNTHETIC` (from simulation) or `DEVICE` (from plate validation on a real phone by the owner). No unlabeled accuracy figure exists in this repository, and **no `DEVICE` figure exists yet**: the author has no phone, camera, or printed plate in the development environment. Every number below is `SYNTHETIC`.
+- Accuracy numbers carry their origin: `SINTETIS` (from simulation) or `PERANGKAT` (from plate validation on a real phone by the owner). No unlabeled accuracy figure exists in this repository (checked by `tools/audit/doc_checks.py`), and **no `PERANGKAT` figure exists yet**: the author has no phone, camera, or printed plate in the development environment. Every number below is `SINTETIS`.
 - Claims about literature and competitors in the original specification (a Witteveen+Bos app, a 5 mm camera-shift error, an add-on lens for 0.3 to 1 mm at 2 m) are reported, not verified. This README makes no comparison with any product.
 - Hairline does not accurately measure cracks that are not coplanar with the marker sheet, and is not suitable for regulatory decisions.
-- Until the OpenCV adapter is wired in (BLOCKERS B1), the app cannot detect markers on a real camera. See [Status](#status).
+- The checked-in `app/` has no marker detector wired in (the native OpenCV build cannot run on every host, BLOCKERS B1). A phone build must use `tools/build_device_apk.sh` (see [Release build](#release-build)); its detection has never run on a real camera. See [Status](#status).
 
 ## The problem
 
@@ -55,14 +55,14 @@ flowchart LR
 
 `opencv_dart` is used only for JPEG decoding, grayscale conversion, patch extraction and ArUco detection; all geometry and measurement are in `hairline_core`.
 
-## Synthetic study (label: SYNTHETIC)
+## Synthetic study (label: SINTETIS)
 
-Full chain on simulated photos (random pose, corner noise 0.2 px, a renderer with exactly known widths): 864 conditions (width 0.1 to 2.0 mm, 0.04 to 0.15 mm/px, blur, noise, tilt 0 to 20 degrees) x 5 replications for calibration plus 1 hold-out, seed 20261117, algorithm `p3-1`. Details and caveats: [docs/SYNTHETIC_VALIDATION.md](docs/SYNTHETIC_VALIDATION.md).
+Full chain on simulated photos (random pose, corner noise 0.2 px, a renderer with exactly known widths; label SINTETIS): 864 conditions (width 0.1 to 2.0 mm, 0.04 to 0.15 mm/px, blur, noise, tilt 0 to 20 degrees) x 5 replications for calibration plus 1 hold-out, seed 20261117, algorithm `p3-1`. Details and caveats: [docs/SYNTHETIC_VALIDATION.md](docs/SYNTHETIC_VALIDATION.md).
 
 - The variance inflation factor `rho = 1.0` is supported (no inflation needed): coverage of the default expanded uncertainty was 100 percent over 3080 measurable calibration visits and 100 percent on the hold-out, with no condition significantly below 90 percent.
 - Honest reading: the default `U` is about 20 times wider than the actual error in simulation (conservative, driven by the unvalidated `u_dev` and the relief term). The simulation has no hand shake, no ISP sharpening, and no real JPEG pipeline. This says nothing about coverage on a phone.
 - Trend unit study (20000 replications): false positives 4.61 percent against a nominal 4.55 percent; detection at the minimum detectable change 50.4 percent, at twice it 97.7 percent.
-- Plate validation, application level: the plate pipeline (32 lines per photo, evaluation, `u_dev`) is tested on synthetic photos only; the tests prove the pipeline works and that simulated runs are stored as `SYNTHETIC`, never as `DEVICE`.
+- Plate validation, application level: the plate pipeline (32 lines per photo, evaluation, `u_dev`) is tested on synthetic photos only; the tests prove the pipeline works and that simulated runs are stored as `SINTETIS`, never as `PERANGKAT`.
 
 ## Making and mounting a sheet
 
@@ -79,7 +79,7 @@ cd tools && dart pub get
 dart run measure_scan.dart --image scan.pgm --dpi 2400 --origin X,Y --out truth.csv
 ```
 
-(`magick scan.tif -colorspace Gray scan.pgm` makes the PGM; `--origin` is the pixel of the window centre.) Then in the app: validation icon on the home screen, print the plate, read the scale bar, paste the `truth.csv` content, and capture at the distance and light you use on cracks. Without a CSV the nominal widths are used with a placeholder `u_truth` of 0.05 mm, labeled "NOMINAL (tidak dikarakterisasi)", and such a run **never** validates the phone. The result screen shows bias, RMSE, coverage and the empirical lower reporting limit per width. A `DEVICE` run with characterized truth, at least 16 measured lines, at least 4 widths, and coverage of at least 90 percent sets `u_dev` for that phone model and removes the `BELUM_DIVALIDASI` label from new measurements. A run on the simulated camera is stored as `SYNTHETIC` and changes nothing. Thresholds and reasoning: DECISIONS D46.
+(`magick scan.tif -colorspace Gray scan.pgm` makes the PGM; `--origin` is the pixel of the window centre.) Then in the app: validation icon on the home screen, print the plate, read the scale bar, paste the `truth.csv` content, and capture at the distance and light you use on cracks. Without a CSV the nominal widths are used with a placeholder `u_truth` of 0.05 mm, labeled "NOMINAL (tidak dikarakterisasi)", and such a run **never** validates the phone. The result screen shows bias, RMSE, coverage and the empirical lower reporting limit per width. A `PERANGKAT` run with characterized truth, at least 16 measured lines, at least 4 widths, and coverage of at least 90 percent sets `u_dev` for that phone model and removes the `BELUM_DIVALIDASI` label from new measurements. A run on the simulated camera is stored as `SINTETIS` and changes nothing. Thresholds and reasoning: DECISIONS D46.
 
 ## Limits
 
@@ -92,13 +92,20 @@ dart run measure_scan.dart --image scan.pgm --dpi 2400 --origin X,Y --out truth.
 
 ## Release build
 
+Two builds exist on purpose (DECISIONS D48):
+
 ```
+# Host-verifiable build: no marker detector (used by CI and `make verify`).
 cd app
 flutter build apk --release
-flutter build appbundle --release
+
+# Phone build with the OpenCV marker detectors wired in (compiles OpenCV from source,
+# needs cmake and ninja; the first build takes tens of minutes):
+make apk-device              # or: tools/build_device_apk.sh --target-platform android-arm64
+adb install -r app/build/app/outputs/flutter-apk/app-release.apk
 ```
 
-R8 and resource shrinking are on. Signing: copy `app/android/key.properties.example` to `app/android/key.properties` (git-ignored), create a keystore with the `keytool` command in that file, and rebuild. Without `key.properties` the build is signed with the debug key: fine for testing, not for distribution. Never commit a keystore.
+R8 and resource shrinking are on. Signing: copy `app/android/key.properties.example` to `app/android/key.properties` (git-ignored), create a keystore with the `keytool` command in that file, and rebuild. Without `key.properties` the build is signed with the debug key: fine for testing, not for distribution. Never commit a keystore. Application backup is disabled (`allowBackup="false"` plus data extraction rules), so photos and measurements never leave the phone except by an explicit user action.
 
 ## Comparison with other products
 
@@ -106,14 +113,14 @@ None. Competitor and literature claims in the original specification are unverif
 
 ## Demo (phone and paper)
 
-Print a sheet, glue it around a real or drawn crack, add the site and crack in the app, take the baseline, tap the crack, and repeat on later days following the ghost outline. Without a camera, `cd app && flutter run -t lib/main_fake.dart` runs the whole flow on synthetic photos, including the plate validation (stored as `SYNTHETIC`).
+Print a sheet, glue it around a real or drawn crack, add the site and crack in the app, take the baseline, tap the crack, and repeat on later days following the ghost outline. Without a camera, `cd app && flutter run -t lib/main_fake.dart` runs the whole flow on synthetic photos, including the plate validation (stored as `SINTETIS`).
 
 ## Status
 
 | Item | Status |
 |---|---|
 | 1 Sheet PDF, mounting guide, print-scale check | SELESAI-TERVERIFIKASI (geometry, vector PDF); real print: SELESAI-PERLU-UJI-PERANGKAT |
-| 2 Marker detection and homography | homography and diagnostics TERVERIFIKASI-SINTETIS; `opencv_dart` detection written, not run (BLOCKERS B1) |
+| 2 Marker detection and homography | homography and diagnostics TERVERIFIKASI-SINTETIS (and recomputed independently, docs/AUDIT.md); `opencv_dart` detection wired only in the phone build (`make apk-device`), written but never run (BLOCKERS B1): SELESAI-PERLU-UJI-PERANGKAT |
 | 3 Pose guidance, burst, quality gate | logic SELESAI-TERVERIFIKASI / TERVERIFIKASI-SINTETIS; real camera SELESAI-PERLU-UJI-PERANGKAT |
 | 4 Crack width at one point | TERVERIFIKASI-SINTETIS; real photos SELESAI-PERLU-UJI-PERANGKAT |
 | 5 Local storage (Drift) | SELESAI-TERVERIFIKASI |
@@ -121,14 +128,14 @@ Print a sheet, glue it around a real or drawn crack, add the site and crack in t
 | 7 Plate validation | pipeline TERVERIFIKASI-SINTETIS (plate generator, CSV import, scan tool, validation mode, `u_dev`); real accuracy SELESAI-PERLU-UJI-PERANGKAT |
 | 8 Pure Dart core | SELESAI-TERVERIFIKASI |
 
-Detailed progress: [docs/PROGRESS.md](docs/PROGRESS.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Run `make verify` for the standard checks.
+Phase 9 independent audit (PASS/FAIL per item, with evidence): [docs/AUDIT.md](docs/AUDIT.md). Detailed progress: [docs/PROGRESS.md](docs/PROGRESS.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md). Run `make verify` for the standard checks.
 
 ## Layout
 
 - `packages/hairline_core`: pure Dart core (no Flutter, no OpenCV).
 - `packages/hairline_opencv`: OpenCV adapters (analyzed; native tests not run on the development host).
 - `app`: Flutter app (Riverpod, go_router, Drift, camera, pdf, printing).
-- `tools`: plate scan measurement (`measure_scan.dart`), spike and sheet checks. `docs`: progress, decisions, backlog, blockers, device test list.
+- `tools`: plate scan measurement (`measure_scan.dart`), phone APK build (`build_device_apk.sh`), audit scripts (`audit/`), spike and sheet checks. `docs`: progress, decisions, backlog, blockers, device test list.
 
 ## License and ownership
 

@@ -4,7 +4,7 @@ Status: **belum dijalankan**. Agent tidak punya ponsel, kamera, atau lembar ceta
 
 Urutan yang disarankan: bagian 10 (cetak dan lembar), 1 sampai 9 (kamera dan alur), lalu 11 (validasi pelat, satu-satunya sumber angka akurasi `PERANGKAT`), lalu 12 (APK rilis). Setiap baris dapat langsung dikerjakan: isi kolom Hasil dengan angka atau "lulus" / "gagal" dan catatan.
 
-Prasyarat build (BLOCKERS B1): app harus sudah bergantung pada `packages/hairline_opencv` dan `main.dart` harus meng-override `framePortsFactoryProvider` dengan `openCvPorts` dan `grayDetectorFactoryProvider` dengan `openCvGrayDetector` (DECISIONS D34, D40). Tanpa itu layar pengambilan hanya menampilkan "Detektor penanda belum tersedia". Pasang lembar bingkai nomor 0 (cetak 100 persen, skala dicek dengan penggaris) rata pada bidang uji. Di build debug, tombol "Uji pengambilan foto (debug, kamera nyata)" di halaman awal membuat retak uji (lembar 0, skala 1, titik di pusat jendela, arah 0 derajat).
+Prasyarat build (BLOCKERS B1, DECISIONS D48): APK dari `flutter build apk` biasa TIDAK punya detektor penanda (layar pengambilan menampilkan "Detektor penanda belum tersedia"). Untuk ponsel, bangun dengan `make apk-device` (atau `tools/build_device_apk.sh --target-platform android-arm64`), yang menyambungkan `hairline_opencv` lewat `lib/main_device.dart`, lalu pasang `app/build/app/outputs/flutter-apk/app-release.apk` dengan `adb install -r`. Build pertama mengompilasi OpenCV dari sumber (puluhan menit; perlu cmake dan ninja). Bila terjadi galat, catat keluarannya di BLOCKERS. Pasang lembar bingkai nomor 0 (cetak 100 persen, skala dicek dengan penggaris) rata pada bidang uji. Di build debug, tombol "Uji pengambilan foto (debug, kamera nyata)" di halaman awal membuat retak uji (lembar 0, skala 1, titik di pusat jendela, arah 0 derajat).
 
 Cara membaca hasil frame: tiap foto yang diterima menyimpan `quality_json` (sigma_px, anisotropi blur, fraksi jenuh, peringatan) di tabel `frames`; bendera pengambilan ada di `visits.camera_info_json` pada kunci `flags` (`fokus_tidak_terkunci`, `eksposur_tidak_terkunci`).
 
@@ -135,3 +135,27 @@ Pertanyaan yang hanya uji ini menjawab: apakah profil retak berkontras rendah di
 | Tanda tangan | Salin `android/key.properties.example` ke `android/key.properties`, buat keystore (perintah `keytool` di berkas contoh), bangun ulang; `apksigner verify --print-certs app-release.apk` | Sertifikat milik pemilik, bukan "Android Debug" | |
 | Pasang dan jalankan | `adb install -r app-release.apk`, buka semua layar | Tidak crash karena R8 (periksa `adb logcat` untuk ClassNotFoundException atau NoSuchMethodError, terutama sqlite, kamera, printing) | |
 | Tanpa jaringan | Mode pesawat, jalankan semua alur | Semua berfungsi | |
+
+## 13. Fase 9: banding dengan studi sintetis (setelah bagian 11)
+Tujuan: melihat apakah perilaku di ponsel mirip simulasi, tanpa mengklaim hasil simulasi sebagai akurasi perangkat. Bandingkan dengan docs/SYNTHETIC_VALIDATION.md (label SINTETIS) dan tulis kedua angka berdampingan dengan labelnya.
+| Langkah | Cara | Hasil yang diharapkan | Hasil |
+|---|---|---|---|
+| 13.1 Cakupan | Dari hasil validasi PERANGKAT (11.7) ambil cakupan per lebar; bandingkan dengan cakupan SINTETIS pada lebar yang sama (tabel per lebar di dokumen studi) | Cakupan PERANGKAT >= 90 persen pada lebar >= 0,3 mm; bila lebih rendah, `u_dev` terlalu kecil atau profil retak diproses ISP berbeda dari garis cetak: catat dan jangan lepas label | |
+| 13.2 Bias | Bandingkan bias PERANGKAT per lebar dengan bias SINTETIS (nilai mikrometer di MEASUREMENT_NOTES) | Bias PERANGKAT lebih besar dari SINTETIS wajar (ISP, JPEG, tanpa linearisasi sempurna); catat tandanya (positif atau negatif) | |
+| 13.3 Lebar terkecil | Bandingkan lebar terkecil yang terukur andal (11.7, 11.10) dengan batas pelaporan SINTETIS | Batas PERANGKAT lebih besar; catat | |
+| 13.4 Konservatisme | Bandingkan `U` yang ditampilkan (BELUM_DIVALIDASI) dengan galat nyata pelat | Studi sintetis menemukan `U` sekitar 20 kali galat; pada ponsel nyata galat lebih besar, jadi rasio itu mengecil. Rasio < 1 berarti `U` terlalu optimistis: laporkan | |
+| 13.5 Positif palsu tren | Ukur dua kunjungan dari retak yang sama (pelat tidak berubah) pada hari berbeda, 10 pasang | Tidak lebih dari 1 pasang dengan z di luar rentang -2 sampai 2 (SINTETIS: positif palsu 0,2 sampai 4,6 persen) | |
+| 13.6 Waktu | Catat waktu pemrosesan satu kunjungan (6 foto) | Dicatat; studi tidak mengukur ponsel | |
+
+## 14. Fase 9: uji kunjungan nyata dua minggu
+Peralatan: ponsel yang sudah lolos bagian 11 (idealnya), lembar cetak 100 persen yang skalanya diukur, retak nyata (atau retak buatan di dinding uji), lem permanen.
+| Hari | Cara | Hasil yang diharapkan | Hasil |
+|---|---|---|---|
+| 0 | Tempel lembar rata, retak di jendela 70 x 70 mm. Tambah situs dan retak di app, masukkan skala dan relief. Kunjungan dasar: ikuti panduan, ketuk retak | Foto dasar lolos; lebar +- U, `mm_per_px` <= 0,10, label sesuai status validasi; hasil dasar dicatat tangan (foto, lebar yang tampak dengan lup) | |
+| 0 | Segera ulang kunjungan kedua dari awal (tanpa membuka layar hasil) | z dalam rentang -2 sampai 2 ("tidak ada perubahan terdeteksi"); catat `delta`, `u_delta`, MDC | |
+| 1, 3, 7, 10, 14 | Kunjungan lanjutan pada jam dan cahaya yang berbeda; gunakan hantu pose | Setiap kunjungan diterima (>= 3 frame) atau ditolak dengan alasan spesifik; catat berapa kali panduan menyatakan siap tanpa bantuan | |
+| Tiap kunjungan | Catat apakah peringatan muncul (TRACKING_OFFSET, MODEL_MISFIT, dll.) | Tidak ada pada lembar yang tidak disentuh; bila muncul tanpa sebab, laporkan | |
+| Hari 5 | Sengaja geser lembar sekitar 1 mm (atau lepas dan tempel ulang, uji pada salinan retak) | Peringatan lembar bergeser muncul, atau retak ditolak; seri harus dianggap terputus | |
+| Hari 14 | Buka layar tren | Grafik dengan batang ketidakpastian, tanda perubahan hanya bila melampaui `u_delta`; tidak ada ekstrapolasi | |
+| Akhir | Bandingkan dengan hasil lup atau jangka sorong pada hari 0 dan 14 | Selisih wajar terhadap `U`; catat hasil dengan label PERANGKAT | |
+| Akhir | Baca semua layar dengan huruf besar dan TalkBack | Semua terbaca, tidak ada teks terpotong | |
