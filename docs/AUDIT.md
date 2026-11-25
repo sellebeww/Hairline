@@ -18,6 +18,8 @@ Semua dijalankan di sesi ini, host macOS 14 arm64, Flutter 3.47.5, Dart 3.13.4, 
 | A6 | `flutter build apk --release` (app tanpa detektor, build host) | berhasil, 61,6 MB (tiga ABI); `aapt dump permissions`: hanya `CAMERA` (dan izin internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` milik aplikasi); tanpa `INTERNET`; `allowBackup=false`; tanpa `libdartcv.so` |
 | A7 | `tools/build_device_apk.sh --target-platform android-arm64` (APK perangkat dengan OpenCV) | berhasil, 35,8 MB arm64; memuat `lib/arm64-v8a/libdartcv.so` 13,4 MB dan `libapp.so`; izin hanya `CAMERA`; `allowBackup=false`; `pubspec.yaml` dan `pubspec.lock` dipulihkan (`git status` bersih untuk keduanya). Percobaan pertama gagal karena dua kesalahan impor di `main.dart` dan `main_device.dart` (Dart 3 `Override` dan provider); percobaan kedua gagal karena kunci hook `dartcv4` dipegang proses sisa percobaan pertama; ketiga berhasil memakai pustaka native yang sudah dikompilasi. Perilaku runtime di perangkat tidak dijalankan: PERANGKAT |
 
+| A8 | `tools/opencv_device_test.sh emulator-5554` (emulator Android arm64, API 29, `opencv_dart` 2.2.2 asli) | **13 dari 13 tes adapter lulus**: urutan sudut pada rotasi 0, 90, 180, 270 dan perspektif, id unik dan di luar lembar, tanpa penanda, detektor live, dekode, ROI, dispose, kebocoran RSS 12 MP. Emulator, bukan ponsel fisik: PERANGKAT untuk ponsel dan kamera nyata |
+
 Kegagalan Tahap A yang ditemukan dan diperbaiki: dua impor (di atas), satu tes manifest yang salah menghitung kata INTERNET di komentar XML (diperbaiki dengan membuang komentar sebelum memeriksa).
 
 ## 2. Tahap B dan C: butir audit
@@ -68,7 +70,7 @@ Skrip: `tools/audit/independent_check.py` (numpy 2.5.5, scipy 1.18.1, OpenCV Pyt
 | N7 | `u_delta`, z, MDC, klasifikasi (5 kasus) | PASS | PASS | selisih 0; kelas sama |
 | N8 | Faktor `k` (14 dof terhadap `scipy.stats.t.ppf`) | FAIL | PASS | Awal: komentar `student_t.dart` mengklaim galat < 0,001, padahal interpolasi 1/dof melebihi kebenaran sampai 0,059 (dof 2 sampai 3; 7,10 vs 6,02 pada dof 1,5). Tidak pernah di bawah kebenaran (konservatif). Akhir: dokumentasi dikoreksi (D50), tes penjaga `student_t_test.dart` "against scipy" dan pemeriksaan independen dengan batas terdokumentasi |
 | N9 | Konsistensi satuan (px, mm, derajat, radian) | FAIL | PASS | Semua pemanggilan sin/cos/tan/atan/acos di core dan app memakai radian dari variabel `...Deg * pi / 180` (grep `\b(sin\|cos\|tan\|atan2?\|acos)\(`). Cacat ditemukan: segmen 4 mm di overlay dikalikan `print_scale` dua kali (H sudah milimeter fisik). Diperbaiki, tes `screens_test.dart` "overlay geometry" diubah (D52) |
-| N10 | Urutan sudut penanda pada empat rotasi | PASS | PASS | Penanda ArUco nyata (OpenCV Python 5.0.0 `DICT_4X4_50`, SUBPIX) dirender pada lembar 8 sampai 11 dan diproyeksikan pada rotasi dalam bidang 0, 90, 180, 270, 45, 200 derajat (tilt 0 sampai 20): 4 penanda terdeteksi di tiap kasus, H core vs H kamera benar paling besar 0,063 px, `rms_px` paling besar 0,24, `loo_mm` paling besar 0,037. Perilaku referensi OpenCV Python, bukan `opencv_dart` (B1) |
+| N10 | Urutan sudut penanda pada empat rotasi | PASS | PASS | Penanda ArUco nyata (OpenCV Python 5.0.0 `DICT_4X4_50`, SUBPIX) dirender pada lembar 8 sampai 11 dan diproyeksikan pada rotasi dalam bidang 0, 90, 180, 270, 45, 200 derajat (tilt 0 sampai 20): 4 penanda terdeteksi di tiap kasus, H core vs H kamera benar paling besar 0,063 px, `rms_px` paling besar 0,24, `loo_mm` paling besar 0,037. Perilaku referensi OpenCV Python; urutan yang sama terbukti pada `opencv_dart` asli di emulator arm64 (A8, D54) |
 | N11 | Tidak ada angka akurasi tanpa label SINTETIS/PERANGKAT di dokumen | PASS | PASS | `python3 tools/audit/doc_checks.py`: semua angka mirip akurasi berlabel (README memakai label Inggris, lihat H5) |
 
 ### 2.4 Pelanggaran asumsi: menolak atau menaikkan ketidakpastian
@@ -142,6 +144,8 @@ Total 65 butir. Sebelas FAIL awal: N8 (klaim galat `k`), N9 (segmen overlay dika
 
 ## 4. Batas audit ini
 
+- Risiko ISP: penajaman unsharp pada penanda dan retak membiaskan lebar rendah sampai -20 um (retak 0,3 mm, SINTETIS) dan baru ditandai `MODEL_MISFIT` bila kuat; tercatat sebagai KNOWN LIMIT dengan tes (MEASUREMENT_NOTES bagian 8). Tidak mengubah hitungan PASS/FAIL di atas karena bukan cacat implementasi.
+
 - Semua pemeriksaan dijalankan di host macOS arm64 tanpa ponsel. Tidak ada angka `PERANGKAT`. Butir B2 di BLOCKERS.md adalah daftar yang hanya dapat dijawab di perangkat nyata.
 - Pembanding independen memakai asumsi model yang sama (profil Gaussian terkonvolusi kotak, titik di tengah piksel, tanpa JPEG nyata). Ia membuktikan implementasi core mengikuti spesifikasi dan bebas dari kesalahan aljabar atau satuan, bukan bahwa spesifikasi cocok dengan kamera nyata.
-- Detektor ArUco yang diperiksa urutan sudutnya adalah OpenCV Python 5.0.0; `opencv_dart` 2.2.2 (OpenCV 4.13) belum pernah dijalankan (B1).
+- Pemeriksaan numerik urutan sudut memakai OpenCV Python 5.0.0; `opencv_dart` 2.2.2 (OpenCV 4.13) dijalankan hanya lewat tes adapter di emulator arm64 (A8), belum di ponsel fisik.

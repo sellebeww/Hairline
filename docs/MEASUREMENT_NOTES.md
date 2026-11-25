@@ -484,3 +484,15 @@ Sumber: `packages/hairline_core/test/frame_pipeline_test.dart`, `dart test` (dij
 - Batas penafsiran: satu seed, satu geometri, citra abu-abu yang disandikan sebagai RGB; codec `image` bukan libjpeg ponsel dan tidak ada penajaman ISP, pengurangan derau, atau subsampling krominans yang berarti. Angka ini membuktikan bahwa kuantisasi DCT (q85 dan q95) sendiri bukan masalah pada lebar 5 px, BUKAN bahwa foto ponsel nyata akan sama. Anggaran 5.5 tidak punya suku JPEG; validasi `PERANGKAT` (Fase 7) yang akan menangkapnya lewat `u_dev`.
 - `U` hampir seluruhnya `u_dev` bawaan 0,5 mm/px (D29), sebab itu 128,7 um jauh di atas galat nyata (sekitar 1 um).
 - Memori (terukur sebagai luas, bukan byte): empat patch penanda masing-masing sekitar 4 sampai 5 persen luas foto, total di bawah 25 persen; tidak ada patch seluruh lembar. Pada foto 12 MP dengan lembar memenuhi bingkai (sekitar 0,05 mm/px) ekstrapolasi kasar dari rasio itu memberi sekitar 2 Mpx Float32 (8 MB) plus salinan linear (8 MB), bukan sekitar 46 MB per salinan untuk satu patch seluruh lembar. Ekstrapolasi ini belum diukur di ponsel.
+
+## 8. Penajaman ISP (Fase 9, SINTETIS)
+
+Ponsel sering mempertajam foto (unsharp mask). Probe: penanda dan retak sama-sama dipertajam (sigma 1,5 px), retak 0,06 mm/px, sigma kernel 1 px, derau 0,005, seed 3 dan 7 (tes `test/measure_test.dart` "ISP sharpening"). Bias lebar (um) dan `u_frame` (um):
+
+| w (mm) | amount 0,5 | amount 1,0 | amount 2,0 | `u_frame` | peringatan |
+|---|---|---|---|---|---|
+| 0,3 | -6,1 | -12,0 | -20,2 | 2,6 sampai 3,5 | `MODEL_MISFIT` mulai amount 1,0 |
+| 0,5 | -3,4 | -6,3 | -10,6 | 1,6 sampai 2,2 | `MODEL_MISFIT` mulai amount 1,0 |
+| 1,0 | -1,4 | -2,6 | -4,5 | 0,8 sampai 2,4 | `MODEL_MISFIT` mulai amount 1,0 |
+
+Artinya: penajaman menggeser lebar rendah secara sistematis (halo di sisi retak dan PSF tepi penanda mengecil), lebih besar dari `u_frame`, dan baru terdeteksi bila kuat. Anggaran bawaan masih menutupinya karena `u_dev` bawaan 0,5 mm/px (sekitar 30 um pada 0,06 mm/px) lebih besar dari bias di atas. Setelah validasi `PERANGKAT`, `u_dev` diambil dari bias garis cetak di pelat; bila garis cetak dan retak berkontras rendah dipertajam berbeda, `u_dev` itu bisa terlalu kecil (risiko 5.3a). Hanya pelat nyata yang menjawab; tidak ada angka PERANGKAT di sini.

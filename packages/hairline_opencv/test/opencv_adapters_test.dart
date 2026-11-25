@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Vassel Goleyu. MIT License.
 //
-// STATUS: written, NOT YET RUN. The native OpenCV build cannot run on the development
-// host (macOS without full Xcode, BLOCKERS B1, DECISIONS D1). Run on Linux CI or with
-// `flutter test` once Xcode is installed: `cd packages/hairline_opencv && flutter test`.
-// Tolerances below are reasoned, not measured.
+// STATUS: all 13 tests PASSED on a real opencv_dart 2.2.2 build running on an Android arm64
+// emulator (API 29), 2026-11-25, via `tools/opencv_device_test.sh` (docs/AUDIT.md bagian 1, A8).
+// They have NOT run on a physical phone, and `flutter test` on a macOS host without full Xcode
+// still fails to build the native library (BLOCKERS B1). Tolerances are reasoned, not measured.
 import 'dart:io';
 import 'dart:typed_data';
 

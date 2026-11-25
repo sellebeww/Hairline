@@ -120,7 +120,7 @@ Print a sheet, glue it around a real or drawn crack, add the site and crack in t
 | Item | Status |
 |---|---|
 | 1 Sheet PDF, mounting guide, print-scale check | SELESAI-TERVERIFIKASI (geometry, vector PDF); real print: SELESAI-PERLU-UJI-PERANGKAT |
-| 2 Marker detection and homography | homography and diagnostics TERVERIFIKASI-SINTETIS (and recomputed independently, docs/AUDIT.md); `opencv_dart` detection wired only in the phone build (`make apk-device`), written but never run (BLOCKERS B1): SELESAI-PERLU-UJI-PERANGKAT |
+| 2 Marker detection and homography | homography and diagnostics TERVERIFIKASI-SINTETIS (and recomputed independently, docs/AUDIT.md); `opencv_dart` detection wired only in the phone build (`make apk-device`); its 13 adapter tests pass on an Android arm64 emulator (`make opencv-device-test`), not yet on a physical phone or a real camera stream: SELESAI-PERLU-UJI-PERANGKAT |
 | 3 Pose guidance, burst, quality gate | logic SELESAI-TERVERIFIKASI / TERVERIFIKASI-SINTETIS; real camera SELESAI-PERLU-UJI-PERANGKAT |
 | 4 Crack width at one point | TERVERIFIKASI-SINTETIS; real photos SELESAI-PERLU-UJI-PERANGKAT |
 | 5 Local storage (Drift) | SELESAI-TERVERIFIKASI |

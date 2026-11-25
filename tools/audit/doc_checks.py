@@ -21,7 +21,7 @@ bad = []
 
 for f in files:
     for n, line in enumerate(f.read_text(errors="ignore").split("\n"), 1):
-        if "—" in line:
+        if chr(0x2014) in line:
             bad.append(f"{f.relative_to(root)}:{n}: em dash")
 
 forbidden = re.compile(r"\b(aman|tidak berbahaya)\b", re.I)

@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Vassel Goleyu. MIT License.
-.PHONY: verify core-test app-test opencv-analyze opencv-test audit-docs audit-numeric apk-device
+.PHONY: verify core-test app-test opencv-analyze opencv-test audit-docs audit-numeric apk-device opencv-device-test
 
 core-test:
 	cd packages/hairline_core && dart pub get && dart analyze --fatal-infos && dart test --coverage=coverage
@@ -32,3 +32,7 @@ audit-numeric:
 # Phone APK with the OpenCV detectors wired in (BLOCKERS B1); extra arguments go to flutter build apk.
 apk-device:
 	tools/build_device_apk.sh
+
+# Adapter tests on a connected Android device or emulator (arm64 emulator proven, DECISIONS D54).
+opencv-device-test:
+	tools/opencv_device_test.sh $(DEVICE)

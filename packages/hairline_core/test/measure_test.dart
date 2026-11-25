@@ -93,6 +93,39 @@ MeasureOutcome measure(
       config: config,
     );
 
+/// Unsharp mask as a phone ISP applies it: `v + amount * (v - gaussian(v, sigma))`, clipped.
+GrayPatch sharpened(GrayPatch p, double amount, {double sigma = 1.5}) {
+  final r = (3 * sigma).ceil(), w = p.width, h = p.height;
+  final k = [for (var i = -r; i <= r; i++) exp(-i * i / (2 * sigma * sigma))];
+  final norm = k.reduce((a, b) => a + b);
+  final tmp = Float64List(w * h), blur = Float64List(w * h);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var a = 0.0;
+      for (var i = -r; i <= r; i++) {
+        a += k[i + r] * p.data[y * w + (x + i).clamp(0, w - 1)];
+      }
+      tmp[y * w + x] = a / norm;
+    }
+  }
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var a = 0.0;
+      for (var i = -r; i <= r; i++) {
+        a += k[i + r] * tmp[(y + i).clamp(0, h - 1) * w + x];
+      }
+      blur[y * w + x] = a / norm;
+    }
+  }
+  return GrayPatch(
+    originX: p.originX,
+    originY: p.originY,
+    width: w,
+    height: h,
+    data: Float32List.fromList([for (var i = 0; i < w * h; i++) (p.data[i] + amount * (p.data[i] - blur[i])).clamp(0.0, 1.0)]),
+  );
+}
+
 void main() {
   group('ideal case, 0.06 mm/px, tilt 0, sigma 1 px, low noise (PSF from marker edges)', () {
     for (final w in [0.3, 0.5, 1.0, 2.0]) {
@@ -475,6 +508,30 @@ void main() {
       expect(bad.widthMm - 0.5, lessThan(-0.010)); // about -18 um in the sweep
       expect(bad.warnings, isNot(contains(MeasureWarning.modelMisfit))); // silent
       expect((good.widthMm - 0.5).abs(), lessThan(0.004));
+    });
+
+    test('KNOWN LIMIT: ISP sharpening (unsharp mask on markers and crack) biases the width low, beyond u_frame, and is flagged only when strong (SINTETIS, phase 9)', () {
+      // SINTETIS probe (w 0.3 mm, sigma 1 px, unsharp sigma 1.5 px): amount 0.5 -> -6 um, 1.0 -> -12 um, 2.0 -> -20 um,
+      // u_frame 2.6 to 3.5 um. The default budget (u_dev = 0.5 mm/px = 30 um) still covers it; only a PERANGKAT plate
+      // validation can say whether real phones sharpen like this (docs/DEVICE_TEST.md 13).
+      final c = cam(distance: 600);
+      final markers = renderCrackPatch(
+        camera: c, scene: sheetScene(sheetId: 0, paper: 0.8), halfSizeMm: 85, supersample: 2, psfSigmaPx: 1.0, noiseSigma: 0.005, rng: Random(3));
+      double errUm(double amount, {List<MeasureWarning>? warnings}) {
+        final psf = estimatePsf(patch: sharpened(markers, amount), h: c.h, sheetId: 0);
+        final m = accepted(measure(sharpened(crackPatch(w: 0.3), amount), psf: psf));
+        warnings?.addAll(m.warnings);
+        return (m.widthMm - 0.3) * 1000;
+      }
+
+      final none = errUm(0), light = errUm(0.5), strong = errUm(2);
+      expect(none.abs(), lessThan(2));
+      expect(light, lessThan(-3), reason: 'light sharpening already biases the width low');
+      expect(strong, lessThan(light));
+      expect(strong, greaterThan(-30), reason: 'bounded: inside the default u_dev');
+      final w = <MeasureWarning>[];
+      errUm(2, warnings: w);
+      expect(w, contains(MeasureWarning.modelMisfit), reason: 'strong sharpening leaves a structured residual');
     });
 
     test('KNOWN LIMIT: a crack blurred 25 percent more than the marker edges is biased beyond u_frame', () {
