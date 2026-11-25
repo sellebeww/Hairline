@@ -10,6 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
       - run: cd packages/hairline_core && dart pub get && dart analyze --fatal-infos && dart test --coverage=coverage
+      - run: python3 tools/audit/doc_checks.py
 
   app:
     runs-on: ubuntu-latest
@@ -18,7 +19,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - run: cd app && flutter pub get && dart run build_runner build
+      - run: cd app && flutter pub get && dart run build_runner build --delete-conflicting-outputs
       - run: cd app && flutter analyze && flutter test
 
   # NOT YET PROVEN (BLOCKERS B1): the native OpenCV build was never run successfully; this job is

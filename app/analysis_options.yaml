@@ -9,3 +9,4 @@ analyzer:
     - build/**
     - android/**
     - '**/*.g.dart'
+    - lib/main_device.dart # needs hairline_opencv, added only by tools/build_device_apk.sh
