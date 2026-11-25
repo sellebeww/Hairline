@@ -1,6 +1,6 @@
 # PROGRESS
 
-Terakhir diperbarui: 2026-11-25, akhir Fase 7.
+Terakhir diperbarui: 2026-11-25, akhir Fase 8.
 
 ## Fase
 
@@ -13,7 +13,7 @@ Terakhir diperbarui: 2026-11-25, akhir Fase 7.
 | 5 | Port + pipeline frame (core), adapter OpenCV (paket terpisah), isolate, Drift, penyimpanan foto, VisitProcessor, provider | SELESAI-TERVERIFIKASI untuk isolate/pipeline/Drift/kunjungan/provider (core 415 tes, app 50 tes, `make verify` bersih); adapter OpenCV: SELESAI-PERLU-UJI-PERANGKAT (ditulis, analyze bersih, tes BELUM dijalankan, B1); app belum bergantung pada paket adapter (D34) |
 | 6 | Alur pengambilan: CameraService (lifecycle, burst, kunci), kanal Kotlin lensa, deteksi live di isolate + throttle, overlay, mesin status, gerbang kualitas pra-simpan, simulasi | SELESAI-TERVERIFIKASI untuk mesin status, analisis pose live, throttle/isolate, lifecycle `DeviceCameraService` (driver tiruan), kanal lensa (channel tiruan), overlay (widget test), alur ujung ke ujung dengan `FakeCameraService` (SINTETIS; app 149 tes, `make verify` bersih; APK debug dan rilis terbangun); kamera nyata (`CameraPluginDriver`), kunci fokus, kanal Kotlin di perangkat, detektor live OpenCV: SELESAI-PERLU-UJI-PERANGKAT (docs/DEVICE_TEST.md) |
 | 7 | Lembar PDF, pemasangan terpandu, layar (situs, retak, detail, titik ukur, hasil, tren, bantuan, tentang), kunjungan dasar dua tahap, proses ulang, aksesibilitas | SELESAI-TERVERIFIKASI untuk kode dan tes host (core 432 tes, app 192 tes, `make verify` bersih); alur ujung ke ujung dengan kamera tiruan: TERVERIFIKASI-SINTETIS; cetak nyata, kamera, OpenCV di perangkat, TalkBack: SELESAI-PERLU-UJI-PERANGKAT (DEVICE_TEST bagian 10) |
-| 8 | Belum dimulai | BELUM |
+| 8 | Pelat validasi (generator PDF, impor CSV, alat pindai), mode validasi di aplikasi, `u_dev` PERANGKAT, validasi sintetis versi aplikasi, build rilis, README dan DEVICE_TEST final | SELESAI-TERVERIFIKASI untuk kode dan tes host (core 482 tes, app 209 tes, `make verify` bersih, APK dan AAB rilis terbangun, manifest hanya CAMERA); pipeline validasi: TERVERIFIKASI-SINTETIS; pelat cetak, pindaian, akurasi nyata, `u_dev` nyata, APK di perangkat: SELESAI-PERLU-UJI-PERANGKAT (DEVICE_TEST bagian 11 dan 12) |
 | 9 | Belum dimulai | BELUM |
 
 ## Butir Wajib
@@ -26,8 +26,8 @@ Terakhir diperbarui: 2026-11-25, akhir Fase 7.
 | 4 | Pengukuran lebar retak sub-pixel | Aplikasi (titik ukur, hasil): TERVERIFIKASI-SINTETIS (tes ujung ke ujung `app/test/e2e_mvp_test.dart`, `locate_point_test.dart`, layar hasil/titik); dengan foto nyata: SELESAI-PERLU-UJI-PERANGKAT. Inti (satu frame, agregasi median, anggaran 5.5, `k` Welch-Satterthwaite, batas ukur): TERVERIFIKASI-SINTETIS. Adapter citra dan validasi perangkat: BELUM | lib/src/{patch,lm,psf,ridge,profile_fit,measure,uncertainty,aggregate,student_t}.dart, test/{...,uncertainty,aggregate,student_t}_test.dart, docs/MEASUREMENT_NOTES.md, docs/SYNTHETIC_VALIDATION.md |
 | 5 | Penyimpanan Drift | SELESAI-TERVERIFIKASI (skema 5.7, FK, migrasi, atomisitas, pemrosesan ulang tanpa menimpa, foto privat + SHA-256, maks 5) | app/lib/data, app/lib/pipeline, app/test/data, app/test/pipeline |
 | 6 | Tren 2 sampai 5 kunjungan | Logika inti (delta, `u_delta`, z, klasifikasi, MDC, peringatan konteks, tanpa regresi): TERVERIFIKASI-SINTETIS. Layar tren, grafik, proses ulang: TERVERIFIKASI-SINTETIS (e2e menandai "kemungkinan bertambah lebar"; tes grafik, layar, string) | lib/src/trend.dart, test/trend_test.dart; app/lib/screens/trend_*.dart, app/test/screens/* |
-| 7 | Validasi pelat + studi sintetis | Studi sintetis penuh (864 kondisi, kalibrasi `rho`): TERVERIFIKASI-SINTETIS. Alat statistik pelat: SELESAI-TERVERIFIKASI (diuji pada data buatan). Pelat nyata, impor CSV, `PERANGKAT`: BELUM | lib/src/synthetic/, lib/src/studies/, lib/src/validation.dart, test/{synthetic,studies,validation}*, tool/run_synthetic_study.dart, docs/SYNTHETIC_VALIDATION.md |
-| 8 | Pustaka inti Dart murni | Sebagian: sheet, linalg, homografi, pose, kualitas, harness, LM, PSF, punggung, model profil, orkestrasi frame SELESAI-TERVERIFIKASI; anggaran 5.5, agregasi, tren, statistik pelat, studi sintetis SELESAI-TERVERIFIKASI | packages/hairline_core (401 tes, cakupan 98,2 persen) |
+| 7 | Validasi pelat + studi sintetis | Pipeline (generator pelat PDF vektor, impor CSV ketat, alat pindai `tools/measure_scan.dart`, mode validasi di aplikasi, penyimpanan `validation_runs`, `u_dev` dan label BELUM_DIVALIDASI, label SINTETIS tidak pernah menjadi PERANGKAT): TERVERIFIKASI-SINTETIS. Studi sintetis penuh (864 kondisi, kalibrasi `rho`): TERVERIFIKASI-SINTETIS. Akurasi nyata (pelat cetak, ponsel, pemindai): SELESAI-PERLU-UJI-PERANGKAT | core: lib/src/{plate,scan_measure,validation}.dart, lib/src/synthetic/plate_scene.dart, test/{plate,scan_measure,validation}_test.dart; app: lib/validation/*, lib/screens/validation_*.dart, test/validation/*, test/screens/validation_screens_test.dart; tools/measure_scan.dart; lib/src/studies/, docs/SYNTHETIC_VALIDATION.md |
+| 8 | Pustaka inti Dart murni | SELESAI-TERVERIFIKASI (sheet, linalg, homografi, pose, kualitas, harness, LM, PSF, punggung, model profil, orkestrasi frame multi-titik, anggaran 5.5, agregasi, tren, pelat, pindaian, studi sintetis) | packages/hairline_core (482 tes) |
 
 ## Toolchain (dicek 2026-11-17, host macOS 14.8.9 arm64)
 
@@ -93,11 +93,17 @@ Hasil Fase 2 (SINTETIS, seed tetap, lihat DECISIONS D17 dan D18): derau sudut 0,
 - TIDAK terbukti: cetak nyata di printer, foto lembar cetak oleh `opencv_dart`, kamera, orientasi EXIF foto di layar titik ukur, TalkBack, kinerja pemrosesan dasar dua kali. Aplikasi belum bergantung pada `hairline_opencv` (D34, B1): APK nyata belum bisa mendeteksi penanda sampai disambungkan. Semua hasil berlabel `BELUM_DIVALIDASI`; tidak ada angka akurasi PERANGKAT.
 - Tangkapan layar tidak dibuat: lihat docs/screenshots/README.md.
 
+## Hasil Fase 8 (apa yang terbukti dan apa tidak)
+
+- Terbukti di host (SINTETIS): foto pelat sintetis 32 titik dalam satu dekode (`processFramePoints`): garis lebar >= 0,5 mm terukur dalam 0,03 mm dari lebar sebenarnya (0,12 mm/px, sigma 1 px); pindaian sintetis 600 dpi (miring 1,5 derajat, titik asal meleset 0,8 mm) terukur dalam 0,012 mm; run validasi lewat alur pengambilan dengan `FakeCameraService` tersimpan `SINTETIS`, tidak pernah `PERANGKAT`, dan tidak mengubah anggaran; run `PERANGKAT` (dengan kebenaran karakterisasi sintetis) menurunkan `u_dev` kunjungan berikutnya untuk model itu dan menghilangkan BELUM_DIVALIDASI; kebenaran NOMINAL tidak pernah memvalidasi; run terbaru yang gagal mencabut validasi.
+- Build rilis (host macOS, Flutter 3.47.5): `flutter build apk --release` 61,6 MB (tiga ABI, tanpa OpenCV karena belum tersambung; unduhan terkompresi menurut `apkanalyzer` 28,0 MB), `appbundle` 61,0 MB; R8 dan penyusutan sumber daya aktif; `aapt dump permissions`: hanya `CAMERA` (dan izin internal app), tanpa `INTERNET`. Ditandatangani kunci debug karena tidak ada `key.properties` (cara pemilik menandatangani: README dan `key.properties.example`).
+- TIDAK terbukti: cetak pelat, pindaian nyata, kamera nyata, deteksi OpenCV, akurasi atau `u_dev` nyata, perilaku R8 pada perangkat. Ambang validasi (16 garis, 4 lebar, cakupan 0,9) adalah nilai awal; cakupan pelat dalam-sampel. Tidak ada angka `PERANGKAT`.
+
 ## Konteks untuk sesi berikutnya
 
 - Baca CLAUDE.md, DECISIONS.md D39 sampai D45 (Fase 6 dan 7), BLOCKERS B1, docs/DEVICE_TEST.md.
 - Fase 7: layar di `app/lib/screens/`, rute di `router.dart`, kunjungan dasar dua tahap (D43): `VisitProcessor.gateBaseline` lalu `storeBaseline` dari `PointController`. Simulasi penuh: `cd app && flutter run -t lib/main_fake.dart` (tambah situs, retak, ambil dasar, ketuk retak di dekat pusat jendela).
-- Berikutnya: sambungkan `hairline_opencv` di `main.dart` (B1), validasi pelat (butir 7: generator pelat, mode validasi, impor CSV, `u_dev` PERANGKAT) tanpa menambah layar di luar daftar fase itu.
+- Fase 8 selesai: pelat (core `plate.dart`, app `lib/validation/`, `screens/validation_*.dart`, `tools/measure_scan.dart`), keputusan D46 dan D47. Berikutnya (Fase 9 bila ada): sambungkan `hairline_opencv` di `main.dart` (B1), jalankan DEVICE_TEST bagian 10 sampai 12, isi README dengan angka berlabel PERANGKAT hanya dari data nyata.
 - Alur pengambilan: `app/lib/capture/` (`capture_flow.dart` reducer murni, `capture_controller.dart` orkestrasi, `device_camera_service.dart` + `camera_driver.dart`, `detection_worker.dart`, `live_analysis.dart`, `capture_page.dart`). Rute `/capture/:crackId`; tombol debug di halaman awal membuat retak uji karena layar pembuat retak belum ada (Fase berikutnya: buat retak, tandai titik ukur dan arah, layar hasil dan tren).
 - Simulasi tanpa kamera: `cd app && flutter run -t lib/main_fake.dart` (butuh sekitar 15 detik membuat foto sintetis); tes: `cd app && flutter test test/capture`.
 - `app/` belum bergantung pada `hairline_opencv` (D34, B1): sambungkan dependensi, `framePortsFactoryProvider` (`openCvPorts`) dan `grayDetectorFactoryProvider` (`openCvGrayDetector`) di `main.dart` (ada TODO), lalu jalankan `make opencv-test` dan DEVICE_TEST.

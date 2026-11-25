@@ -2,6 +2,8 @@
 
 Status: **belum dijalankan**. Agent tidak punya ponsel, kamera, atau lembar cetak nyata (CLAUDE.md aturan 7). Semua butir di bawah berstatus `SELESAI-PERLU-UJI-PERANGKAT` sampai pemilik mengisi kolom hasil. Catat model ponsel, versi Android, dan tanggal untuk setiap uji. Jangan menulis angka tanpa label `PERANGKAT` dan tanpa data yang benar-benar diukur.
 
+Urutan yang disarankan: bagian 10 (cetak dan lembar), 1 sampai 9 (kamera dan alur), lalu 11 (validasi pelat, satu-satunya sumber angka akurasi `PERANGKAT`), lalu 12 (APK rilis). Setiap baris dapat langsung dikerjakan: isi kolom Hasil dengan angka atau "lulus" / "gagal" dan catatan.
+
 Prasyarat build (BLOCKERS B1): app harus sudah bergantung pada `packages/hairline_opencv` dan `main.dart` harus meng-override `framePortsFactoryProvider` dengan `openCvPorts` dan `grayDetectorFactoryProvider` dengan `openCvGrayDetector` (DECISIONS D34, D40). Tanpa itu layar pengambilan hanya menampilkan "Detektor penanda belum tersedia". Pasang lembar bingkai nomor 0 (cetak 100 persen, skala dicek dengan penggaris) rata pada bidang uji. Di build debug, tombol "Uji pengambilan foto (debug, kamera nyata)" di halaman awal membuat retak uji (lembar 0, skala 1, titik di pusat jendela, arah 0 derajat).
 
 Cara membaca hasil frame: tiap foto yang diterima menyimpan `quality_json` (sigma_px, anisotropi blur, fraksi jenuh, peringatan) di tabel `frames`; bendera pengambilan ada di `visits.camera_info_json` pada kunci `flags` (`fokus_tidak_terkunci`, `eksposur_tidak_terkunci`).
@@ -104,3 +106,32 @@ Stream dan foto diam memakai satu preset (`ResolutionPreset.max`, DECISIONS D39)
 | Ketuk retak sangat samar | Pesan "Retak tidak ditemukan ...", tidak ada titik palsu | |
 | Dua kunjungan lanjutan dengan retak membesar | Tren menampilkan klasifikasi sesuai; label BELUM_DIVALIDASI tampil | |
 | Skala font sistem terbesar dan TalkBack | Tidak ada teks terpotong; pembaca layar membacakan label grafik dan gambar | |
+
+## 11. Fase 8: validasi pelat (menghasilkan angka `PERANGKAT`)
+Peralatan: printer, kertas putih, penggaris, pemindai flatbed (minimal 1200 dpi, ideal 2400 dpi) atau lup bertakar, ponsel uji. Agent tidak dapat menjalankan bagian ini; tanpa dijalankan tidak ada angka akurasi perangkat.
+
+| Langkah | Cara | Hasil yang diharapkan | Hasil |
+|---|---|---|---|
+| 11.1 Cetak pelat | Aplikasi: ikon "Validasi ponsel dengan pelat" di halaman awal > Cetak pelat, 100 persen, tanpa "Fit to page", jangan digunting | Batang skala terukur 100 mm +- 1 mm; 32 garis dan label V1, V2, H1, H2 terbaca | |
+| 11.2 Tempel | Tempel pelat rata pada papan keras atau dinding, bidang datar | Tidak ada gelembung atau lipatan | |
+| 11.3 Karakterisasi (disarankan) | Pindai pelat rata, abu-abu, tanpa penajaman, simpan TIFF/PNG, ubah ke PGM: `magick scan.tif -colorspace Gray scan.pgm`. Buka di penampil gambar, catat piksel pusat jendela 70 mm (titik asal). `cd tools && dart pub get && dart run measure_scan.dart --image scan.pgm --dpi 2400 --origin X,Y --out truth.csv` (tambah `--angle` bila pelat miring, `--sigma-px` bila penanda tidak ikut terpindai) | Tabel per garis di layar terminal; `truth.csv` berisi 24 sampai 32 baris. Lebar terukur lebih besar dari nominal (dot gain) wajar. Garis `DI_BAWAH_BATAS_UKUR` pada 0,1 mm: naikkan dpi | |
+| 11.3b Alternatif | Ukur dengan lup bertakar atau celah feeler gauge, isi CSV `posisi,lebar_mm,u_mm` sendiri (minimal 8 baris, titik desimal) | CSV diterima aplikasi | |
+| 11.4 Skala | Ukur batang skala dengan penggaris, masukkan hasilnya (mm) di layar validasi | Skala tercetak ditampilkan di hasil | |
+| 11.5 Kebenaran | Pilih "Impor CSV", tempel isi `truth.csv` | Pesan galat spesifik bila CSV rusak (uji dengan CSV salah: header salah, posisi tak dikenal, lebar 10x nominal) | |
+| 11.6 Ambil | Mulai validasi, ikuti panduan, ambil burst pada jarak dan cahaya yang SAMA dengan pemakaian untuk retak | Layar hasil validasi dengan label PERANGKAT | |
+| 11.7 Baca hasil | Catat per lebar: terukur dari n, bias, RMSE, cakupan; batas bawah empiris; apakah "memenuhi ambang" | Angka berlabel PERANGKAT, model ponsel, tanggal. Catat di README bagian status dengan label itu | |
+| 11.8 Efek ke retak | Ukur retak pada ponsel yang sama setelah validasi yang memenuhi ambang | Label BELUM_DIVALIDASI tidak tampil, `u_dev` di anggaran sama dengan hasil validasi | |
+| 11.9 Pencabutan | Ulangi validasi dengan kebenaran NOMINAL | Hasil tersimpan tetapi TIDAK memenuhi ambang; pengukuran baru kembali berlabel BELUM_DIVALIDASI | |
+| 11.10 Sensitivitas | Ulangi pada jarak lebih jauh dan pada cahaya redup | Lebar terkecil yang terukur andal naik; cakupan dicatat | |
+| 11.11 Pindaian vs lup | Bandingkan lebar karakterisasi pindaian dan lup untuk 3 garis | Selisih di dalam `u_mm` keduanya; bila tidak, perbesar `--scale-u-rel` dan laporkan | |
+
+Pertanyaan yang hanya uji ini menjawab: apakah profil retak berkontras rendah diproses ISP ponsel berbeda dari garis cetak hitam (5.3a catatan), apakah cakupan 90 persen bertahan di luar sampel, dan berapa `u_dev` nyata.
+
+## 12. Fase 8: APK rilis
+| Uji | Cara | Hasil yang diharapkan | Hasil |
+|---|---|---|---|
+| Bangun | `cd app && flutter build apk --release && flutter build appbundle --release` | Berhasil; ukuran dicatat di PROGRESS | |
+| Izin | `aapt dump permissions app-release.apk` | Hanya `CAMERA` dan izin internal app (`DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`); tanpa `INTERNET` | |
+| Tanda tangan | Salin `android/key.properties.example` ke `android/key.properties`, buat keystore (perintah `keytool` di berkas contoh), bangun ulang; `apksigner verify --print-certs app-release.apk` | Sertifikat milik pemilik, bukan "Android Debug" | |
+| Pasang dan jalankan | `adb install -r app-release.apk`, buka semua layar | Tidak crash karena R8 (periksa `adb logcat` untuk ClassNotFoundException atau NoSuchMethodError, terutama sqlite, kamera, printing) | |
+| Tanpa jaringan | Mode pesawat, jalankan semua alur | Semua berfungsi | |

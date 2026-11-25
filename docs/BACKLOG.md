@@ -10,3 +10,6 @@ Ide di luar scope Wajib. Satu baris per ide, tidak dikerjakan.
 - Jalur berkas untuk burst bila foto 12 MP dalam memori (6 x sekitar 5 MB) menjadi masalah di ponsel murah (2026-11-25).
 - Proses ulang foto dasar sekali saja (hemat satu putaran pemrosesan di kunjungan dasar, D43) (2026-11-25).
 - Tampilan lup (zoom otomatis) pada segmen 4 mm di layar titik ukur (2026-11-25).
+- Pemilih berkas CSV (butuh `file_picker`, catat di DECISIONS) menggantikan tempel dari papan klip pada impor kebenaran pelat (2026-11-25).
+- Pendaftaran otomatis pindaian pelat (cari empat persegi penanda) menggantikan `--origin` manual di `tools/measure_scan.dart` (2026-11-25).
+- Validasi kros (leave-one-set-out) untuk cakupan pelat agar tidak dalam-sampel (2026-11-25).
