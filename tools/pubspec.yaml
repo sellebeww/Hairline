@@ -1,0 +1,11 @@
+name: hairline_tools
+description: Command line tools of Hairline (plate scan measurement). Not shipped. Copyright (c) 2026 Vassel Goleyu.
+publish_to: none
+# Copyright (c) 2026 Vassel Goleyu. MIT License.
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  hairline_core:
+    path: ../packages/hairline_core

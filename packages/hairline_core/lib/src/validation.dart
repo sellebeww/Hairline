@@ -100,6 +100,36 @@ final class PlateStats {
   /// Ordered by truth width.
   final List<WidthGroupStats> groups;
 
+  /// Reads [toJson]; throws [FormatException] for another shape. Only the fields that
+  /// later visits need are exact (`truth_mm`, `bias_mm` per group); a null number is NaN.
+  factory PlateStats.fromJson(Map<String, Object?> json) {
+    double num_(Object? v) => v is num ? v.toDouble() : double.nan;
+    final groups = json['groups'];
+    if (groups is! List) throw const FormatException('Unsupported plate statistics JSON');
+    return PlateStats(
+      n: (json['n']! as num).toInt(),
+      reported: (json['reported']! as num).toInt(),
+      biasMm: num_(json['bias_mm']),
+      rmseMm: num_(json['rmse_mm']),
+      coverage: num_(json['coverage']),
+      lowerLimitMm: (json['lower_limit_mm'] as num?)?.toDouble(),
+      groups: [
+        for (final g in groups.cast<Map<String, Object?>>())
+          WidthGroupStats(
+            truthMm: (g['truth_mm']! as num).toDouble(),
+            n: (g['n']! as num).toInt(),
+            reported: (g['reported']! as num).toInt(),
+            biasMm: num_(g['bias_mm']),
+            rmseMm: num_(g['rmse_mm']),
+            sdMm: num_(g['sd_mm']),
+            coverage: num_(g['coverage']),
+            uExpandedMedianMm: num_(g['u_expanded_median_mm']),
+            reliable: g['reliable']! as bool,
+          ),
+      ],
+    );
+  }
+
   /// Stable JSON; NaN is written as null.
   Map<String, Object?> toJson() {
     Object? f(double v) => v.isFinite ? v : null;

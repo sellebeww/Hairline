@@ -131,6 +131,13 @@ Map<String, Object?> homographyToJson(Mat3 h, ImageSize size) => {
   return (h: [for (final v in h) (v as num).toDouble()], size: ImageSize(image['w'] as int, image['h'] as int));
 }
 
+/// A measurement point of one photo: sheet mm and crack direction (degrees).
+final class FramePoint {
+  const FramePoint(this.pointMm, this.directionDeg);
+  final Pt pointMm;
+  final double directionDeg;
+}
+
 /// Processes one photo: decode, detect, homography, geometry gate, patches (marker
 /// edges for the PSF and the crack ROI, linearized from sRGB, D26), `measureFrame`.
 ///
@@ -141,15 +148,32 @@ FrameOutcome processFrame({
   required Uint8List encoded,
   required FramePorts ports,
   required FrameContext context,
+}) =>
+    processFramePoints(
+      encoded: encoded,
+      ports: ports,
+      context: context,
+      points: [FramePoint(context.pointMm, context.directionDeg)],
+    ).single;
+
+/// Like [processFrame] for several measurement [points] of the same photo (the validation
+/// plate has 32): the photo is decoded, its markers detected, the homography and the PSF
+/// estimated once; the geometry gate, the patch and the measurement run per point.
+/// Returns one outcome per point, in order. `context.pointMm` and `directionDeg` are ignored.
+List<FrameOutcome> processFramePoints({
+  required Uint8List encoded,
+  required FramePorts ports,
+  required FrameContext context,
+  required List<FramePoint> points,
 }) {
   final DecodedImage image;
   try {
     image = ports.source.decode(encoded);
   } on FrameDecodeException {
-    return _rejected(FrameRejection.imageUnreadable);
+    return [for (final _ in points) _rejected(FrameRejection.imageUnreadable)];
   }
   try {
-    return _process(image, ports.detector, context);
+    return _process(image, ports.detector, context, points);
   } finally {
     image.dispose();
   }
@@ -165,7 +189,7 @@ FrameOutcome _rejected(FrameRejection r, {ImageSize? size, HomographyEstimate? e
       messages: [r.message],
     );
 
-FrameOutcome _process(DecodedImage image, MarkerDetector detector, FrameContext ctx) {
+List<FrameOutcome> _process(DecodedImage image, MarkerDetector detector, FrameContext ctx, List<FramePoint> points) {
   final size = ImageSize(image.width, image.height);
   final detections = detector.detect(image);
   final sheetIds = markerIdsForSheet(ctx.sheetId);
@@ -173,18 +197,48 @@ FrameOutcome _process(DecodedImage image, MarkerDetector detector, FrameContext 
 
   final HomographyEstimate est;
   final double tilt;
-  final double mmPerPx;
   try {
     est = estimateSheetHomography(detections, sheetId: ctx.sheetId, printScale: ctx.printScale);
     final k = CameraIntrinsics.fromImage(size, focalMm: ctx.focalMm, sensorLongSideMm: ctx.sensorLongSideMm);
     tilt = estimateTilt(est.h, k).tiltDeg;
-    mmPerPx = est.localScale(ctx.pointMm).mmPerPx;
   } on TooFewMarkersException {
-    return _rejected(FrameRejection.tooFewMarkers, size: size);
+    return [for (final _ in points) _rejected(FrameRejection.tooFewMarkers, size: size)];
+  } on HomographyException {
+    return [for (final _ in points) _rejected(FrameRejection.homographyFailed, size: size)];
+  }
+
+  // The PSF depends on the markers only: estimated once, and its failure is replayed per point.
+  PsfEstimate? psf;
+  MeasurementException? psfError;
+  PsfEstimate psfOnce() {
+    if (psfError != null) throw psfError!;
+    try {
+      return psf ??= _psf(image, size, est, usedIds, ctx);
+    } on MeasurementException catch (e) {
+      psfError = e;
+      rethrow;
+    }
+  }
+
+  return [for (final p in points) _processPoint(image, size, est, tilt, usedIds, ctx, p, psfOnce)];
+}
+
+FrameOutcome _processPoint(
+  DecodedImage image,
+  ImageSize size,
+  HomographyEstimate est,
+  double tilt,
+  List<int> usedIds,
+  FrameContext ctx,
+  FramePoint point,
+  PsfEstimate Function() psfOnce,
+) {
+  final double mmPerPx;
+  try {
+    mmPerPx = est.localScale(point.pointMm).mmPerPx;
   } on HomographyException {
     return _rejected(FrameRejection.homographyFailed, size: size);
   }
-
   final verdict = evaluateFrameGeometry(
     FrameGeometry(markerCount: est.markerCount, rmsPx: est.rmsPx, looMm: est.looMm, tiltDeg: tilt, mmPerPx: mmPerPx),
     thresholds: ctx.thresholds,
@@ -210,7 +264,7 @@ FrameOutcome _process(DecodedImage image, MarkerDetector detector, FrameContext 
 
   MeasureOutcome outcome;
   try {
-    outcome = _measure(image, size, est, usedIds, ctx);
+    outcome = _measure(image, size, est, usedIds, ctx, point, psfOnce());
   } on MeasurementException catch (e) {
     outcome = MeasureRejected(e.reason, e.message);
   }
@@ -228,7 +282,7 @@ FrameOutcome _process(DecodedImage image, MarkerDetector detector, FrameContext 
   }
 }
 
-MeasureOutcome _measure(DecodedImage image, ImageSize size, HomographyEstimate est, List<int> usedIds, FrameContext ctx) {
+PsfEstimate _psf(DecodedImage image, ImageSize size, HomographyEstimate est, List<int> usedIds, FrameContext ctx) {
   final markerPatches = <int, GrayPatch>{};
   for (final id in usedIds) {
     final c = markerCenterMm(id, printScale: ctx.printScale);
@@ -236,16 +290,27 @@ MeasureOutcome _measure(DecodedImage image, ImageSize size, HomographyEstimate e
     final p = _extract(image, size, est.h, c, half);
     if (p != null) markerPatches[id] = p;
   }
-  final PsfEstimate psf = estimatePsfFromPatches(patches: markerPatches, h: est.h, printScale: ctx.printScale);
-  final crack = _extract(image, size, est.h, ctx.pointMm, crackPatchHalfMm * ctx.printScale);
+  return estimatePsfFromPatches(patches: markerPatches, h: est.h, printScale: ctx.printScale);
+}
+
+MeasureOutcome _measure(
+  DecodedImage image,
+  ImageSize size,
+  HomographyEstimate est,
+  List<int> usedIds,
+  FrameContext ctx,
+  FramePoint point,
+  PsfEstimate psf,
+) {
+  final crack = _extract(image, size, est.h, point.pointMm, crackPatchHalfMm * ctx.printScale);
   if (crack == null) {
     return const MeasureRejected(RejectReason.patchTooSmall, 'Titik ukur berada di luar foto. Arahkan kamera ke jendela lembar.');
   }
   return measureFrame(
     patch: crack,
     h: est.h,
-    pointMm: ctx.pointMm,
-    directionDeg: ctx.directionDeg,
+    pointMm: point.pointMm,
+    directionDeg: point.directionDeg,
     sheetId: ctx.sheetId,
     printScale: ctx.printScale,
     markerIds: usedIds,

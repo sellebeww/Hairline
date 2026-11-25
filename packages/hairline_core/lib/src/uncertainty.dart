@@ -114,6 +114,9 @@ final class UncertaintyOptions {
   /// `u_dev` from the latest PERANGKAT validation for this phone at a comparable
   /// width (validation.dart). Null: use the unvalidated default.
   final double? uDevMm;
+
+  /// The same options with another `u_dev`.
+  UncertaintyOptions withUDev(double? value) => UncertaintyOptions(dzMm: dzMm, uPrintRel: uPrintRel, uDevMm: value);
 }
 
 /// The 5.5 uncertainty budget of one visit, every component explicit (mm, standard
