@@ -91,6 +91,42 @@ void main() {
     });
   });
 
+  group('assumption violations seen by the geometry gate (phase 9 audit)', () {
+    final blank = Uint8List(_image.width * _image.height)..fillRange(0, _image.width * _image.height, 128);
+    final ports = const FramePorts(source: SyntheticPhotoSource(), detector: EmbeddedMarkerDetector());
+    FrameOutcome run(List<MarkerDetection> d) => _run(SyntheticPhotoCodec.encode(blank, _image.width, _image.height, d), ports);
+    List<MarkerDetection> detect({SyntheticCamera? camera, Set<int> omit = const {}}) =>
+        SyntheticDetector(noisePx: 0.2, rng: Random(1)).detect(camera ?? _camera(), sheetId: 0, omit: omit);
+    List<MarkerDetection> moved(List<MarkerDetection> d, int id, Pt by, {int? corner}) => [
+          for (final m in d)
+            m.id != id
+                ? m
+                : MarkerDetection(id: id, corners: [
+                    for (var i = 0; i < 4; i++) (corner == null || corner == i) ? m.corners[i] + by : m.corners[i],
+                  ]),
+        ];
+
+    test('a marker 10 px (1.2 mm) off its place (sheet lifted, not flat): the frame is rejected, nothing is measured', () {
+      final o = run(moved(detect(), 2, const Pt(10, 0)));
+      expect(o.accepted, isFalse);
+      expect(o.measurement, isNull);
+      expect(o.input.geometryRejections, anyOf(contains(FrameRejection.looTooHigh), contains(FrameRejection.rmsTooHigh)));
+    });
+
+    test('only three markers and one corner of one 12 px off (marker half covered, wrong corner): rejected by the reprojection RMS', () {
+      final o = run(moved(detect(omit: {3}), 1, const Pt(0, 12), corner: 0));
+      expect(o.accepted, isFalse);
+      expect(o.input.geometryRejections, contains(FrameRejection.rmsTooHigh));
+    });
+
+    test('too far away (0.36 mm/px against the 0.20 limit): rejected as too coarse', () {
+      final far = SyntheticCamera(image: _image, fPx: 1280, distanceMm: 0.36 * 1280, tiltDeg: 8, tiltAzimuthDeg: 40, rollDeg: 12);
+      final o = run(detect(camera: far));
+      expect(o.accepted, isFalse);
+      expect(o.input.geometryRejections, contains(FrameRejection.resolutionTooCoarse));
+    });
+  });
+
   group('memory: no whole-frame patches', () {
     test('the patches taken from a photo cover a small fraction of it (4 marker edges + the crack ROI)', () {
       final cam = _camera();

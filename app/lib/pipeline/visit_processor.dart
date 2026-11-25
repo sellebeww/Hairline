@@ -236,7 +236,7 @@ class VisitProcessor {
         referencePoseJson: referencePoseJson,
         algorithmVersion: algorithmVersion,
         frames: [for (var n = 0; n < kept.length; n++) _frameDraft(outcomes[kept[n]], files[n])],
-        aggregate: _aggregateDraft(result, algorithmVersion, validation),
+        aggregate: _aggregateDraft(result, algorithmVersion, validation, outcomes),
       ));
       return VisitStored(result: result, frames: outcomes, visitId: visitId);
     } catch (_) {
@@ -331,7 +331,7 @@ class VisitProcessor {
     await repository.addReprocessedMeasurements(
       visitId: visitId,
       algorithmVersion: algorithmVersion,
-      aggregate: _aggregateDraft(result, algorithmVersion, validation),
+      aggregate: _aggregateDraft(result, algorithmVersion, validation, outcomes),
       perFrame: {
         for (var i = 0; i < outcomes.length; i++)
           if (outcomes[i].accepted) stored[i].id: _frameMeasurementDraft(outcomes[i]),
@@ -386,7 +386,24 @@ class VisitProcessor {
     );
   }
 
-  static MeasurementDraft _aggregateDraft(VisitResult r, String version, StoredValidation? validation) {
+  /// How many of the kept frames carried each measurement warning (code to count): the result
+  /// screen must show a caution that only some frames raised (misfit, bound, slipped sheet).
+  static Map<String, int> _warningCounts(List<FrameOutcome> outcomes) {
+    final counts = <String, int>{};
+    for (final o in outcomes.where((o) => o.accepted).take(QualityThresholds.standard.maxStoredFrames)) {
+      for (final w in o.measurement?.warnings ?? const <MeasureWarning>[]) {
+        counts[w.code] = (counts[w.code] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
+  static MeasurementDraft _aggregateDraft(
+    VisitResult r,
+    String version,
+    StoredValidation? validation,
+    List<FrameOutcome> outcomes,
+  ) {
     final b = r.budget;
     final numeric = r.status == VisitStatus.terukur && b != null;
     return MeasurementDraft(
@@ -405,6 +422,7 @@ class VisitProcessor {
         'validation_run_id': b != null && !b.belumDivalidasi ? validation?.id : null,
         'accepted_frames': r.acceptedFrames,
         'excluded_unmeasurable_frames': r.excludedUnmeasurableFrames,
+        'frame_warnings': _warningCounts(outcomes),
         'frame_rejections': [for (final x in r.frameRejections) {'frame': x.frame, 'code': x.code}],
       }),
     );

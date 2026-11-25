@@ -23,6 +23,7 @@ final class AggregateView {
     required this.acceptedFrames,
     required this.issueCode,
     required this.frameRejectionCodes,
+    required this.frameWarnings,
   });
 
   factory AggregateView.fromRow(Measurement m) {
@@ -47,6 +48,10 @@ final class AggregateView {
       frameRejectionCodes: [
         if (rejections is List) for (final r in rejections) if (r is Map && r['code'] is String) r['code'] as String,
       ],
+      frameWarnings: {
+        for (final e in _asMap(c['frame_warnings']).entries)
+          if (e.value is num && (e.value as num) > 0) e.key: (e.value as num).toInt(),
+      },
     );
   }
 
@@ -66,6 +71,9 @@ final class AggregateView {
   final int acceptedFrames;
   final String? issueCode;
   final List<String> frameRejectionCodes;
+
+  /// Measurement warning code to the number of kept frames that raised it (empty for rows stored before phase 9).
+  final Map<String, int> frameWarnings;
 
   bool get numeric => status == VisitStatus.terukur && widthMm != null && uRandMm != null;
 }

@@ -14,7 +14,9 @@ const int cornerRefineSubpix = 1;
 ///
 /// Returns OpenCV's own corner order for each marker (TL, TR, BR, BL of the marker
 /// itself, which the marker bits fix whatever the rotation of the phone, D2), keeps only
-/// ids of the dictionary (0 to 49) and drops duplicates of an id. The list order of
+/// ids of the dictionary (0 to 49). A duplicated id (two copies of a sheet in view, or a false
+/// positive) is passed on as it is: the core refuses the frame with `InvalidDetectionException`
+/// instead of silently trusting whichever copy came first. The list order of
 /// OpenCV is NOT id order; the core maps by id. Detector, parameters, dictionary and all
 /// result vectors are created and released inside one [ResourceScope] per call.
 final class OpenCvMarkerDetector implements MarkerDetector {
@@ -55,11 +57,10 @@ List<MarkerDetection> _detectMarkers(ResourceScope scope, cv.Mat gray) {
   scope.add(corners, (v) => v.dispose());
   scope.add(ids, (v) => v.dispose());
   scope.add(rejected, (v) => v.dispose());
-  final seen = <int>{};
   final out = <MarkerDetection>[];
   for (var k = 0; k < ids.length; k++) {
     final id = ids[k];
-    if (id < 0 || id >= arucoDictionarySize || !seen.add(id)) continue;
+    if (id < 0 || id >= arucoDictionarySize) continue;
     final quad = scope.add(corners[k], (v) => v.dispose());
     if (quad.length != 4) continue;
     final pts = [for (var j = 0; j < 4; j++) scope.add(quad[j], (pt) => pt.dispose())];

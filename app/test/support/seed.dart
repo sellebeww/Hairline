@@ -67,6 +67,7 @@ Future<int> seedVisit(
   String version = measurementAlgorithmVersion,
   String device = 'Pixel 7',
   bool validated = false,
+  Map<String, int> frameWarnings = const {},
 }) {
   final numeric = status == VisitStatus.terukur;
   final budget = status == VisitStatus.tidakTerukur
@@ -100,6 +101,7 @@ Future<int> seedVisit(
         'issue': status == VisitStatus.tidakTerukur ? VisitIssue.mostlyUnmeasurable.code : null,
         'accepted_frames': 5,
         'frame_rejections': const <Object>[],
+        'frame_warnings': frameWarnings,
       }),
     ),
   ));

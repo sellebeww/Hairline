@@ -28,6 +28,13 @@ const double _saturationLevel = 0.995;
 /// 1.2 percent or more for rough edges (amplitude 0.08 mm), a one-sided shadow or a stain.
 const double misfitWarningRel = 0.01;
 
+/// Distance (mm) between the stored measurement point and the crack ridge found at the
+/// visit above which [MeasureWarning.trackingOffset] is added. A sheet that slipped or was
+/// re-applied, or a point that was never on the crack, shows up as a ridge off the stored
+/// point (the search radius is 1.5 mm). 0.5 mm is about ten times the sheet position
+/// error of a good 4-marker frame; UNTUNED on real devices.
+const double maxTrackingOffsetMm = 0.5;
+
 /// Largest width covered by the synthetic validation (tool/measurement_sweep.dart:
 /// `ideal`). Between this and the 3 mm model limit the SINTETIS error grows to
 /// 68 +- 56 um at 2.6 mm while `u_frame` stays near 0.2 um, so the result carries
@@ -75,7 +82,11 @@ enum MeasureWarning {
   fewPsfEdges('FEW_PSF_EDGES'),
 
   /// The width exceeds [maxValidatedWidthMm]: only validated up to there.
-  widthBeyondValidated('WIDTH_BEYOND_VALIDATED');
+  widthBeyondValidated('WIDTH_BEYOND_VALIDATED'),
+
+  /// The crack ridge lies more than [maxTrackingOffsetMm] from the stored point: the
+  /// sheet may have moved since the baseline (the series would then be broken, 5.1).
+  trackingOffset('TRACKING_OFFSET');
 
   const MeasureWarning(this.code);
   final String code;
@@ -293,6 +304,7 @@ MeasureOutcome measureFrame({
           if (fit.alignmentFallback) MeasureWarning.alignmentFallback,
           if (fit.boundsActive.contains('D') || fit.boundsActive.contains('w')) MeasureWarning.parameterAtBound,
           if (estimate.edges.length < 6) MeasureWarning.fewPsfEdges,
+          if (ridge.offsetMm > maxTrackingOffsetMm) MeasureWarning.trackingOffset,
           if (fit.widthMm > 1.05 * maxValidatedWidthMm) MeasureWarning.widthBeyondValidated, // 5 percent: a 2.0 mm crack measures 2.000 to 2.001
         ],
         psf: estimate,

@@ -71,7 +71,7 @@ void main() {
       expect(coverageFactor(1e9), closeTo(normalQuantile975, 1e-6));
     });
 
-    test('between integers it lies between neighbours and never undercuts the truth by more than 0.003 (dof 1..200)', () {
+    test('between integers it lies between the table neighbours; NIST rows beyond 30 within 0.003', () {
       for (var v = 1.0; v <= 200; v += 0.37) {
         final k = coverageFactor(v);
         // true quantile bracket: t(ceil) <= truth <= t(floor) holds for the table; interpolation must be conservative-ish
@@ -84,6 +84,27 @@ void main() {
       expect(coverageFactor(40), closeTo(2.021, 0.003));
       expect(coverageFactor(60), closeTo(2.000, 0.003));
       expect(coverageFactor(100), closeTo(1.984, 0.003));
+    });
+
+    test('against scipy t.ppf(0.975, dof) at non-integer dof: never below the truth, overshoot within the documented bound (phase 9 audit)', () {
+      // (dof, truth, bound): truth from scipy 1.18.1 `stats.t.ppf(0.975, dof)`; bound = documented overshoot of that range.
+      const cases = <(double, double, double)>[
+        (2.5, 3.574655, 0.06),
+        (3.5, 2.940089, 0.011),
+        (4.5, 2.658912, 0.011),
+        (6.3, 2.418943, 0.0015),
+        (7.3, 2.345067, 0.0015),
+        (12.5, 2.169186, 0.001),
+        (29.5, 2.043725, 0.001),
+        (45, 2.014103, 0.001),
+        (80, 1.990063, 0.001),
+        (150, 1.975905, 0.001),
+      ];
+      for (final (dof, truth, bound) in cases) {
+        final k = coverageFactor(dof);
+        expect(k, greaterThanOrEqualTo(truth - 1e-6), reason: 'dof $dof must not undercut the true quantile');
+        expect(k - truth, lessThanOrEqualTo(bound), reason: 'dof $dof overshoot');
+      }
     });
 
     test('dof below 1 is clamped to 1 (never an unbounded factor)', () {

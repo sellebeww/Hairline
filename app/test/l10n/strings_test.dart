@@ -21,6 +21,15 @@ void main() {
     expect([for (final l in literals) if (forbidden.hasMatch(l)) l], isEmpty);
   });
 
+  test('every measurement warning has its own Indonesian caution (no fallback text, no "aman")', () {
+    for (final w in MeasureWarning.values) {
+      final t = Strings.measureWarning(w.code, 3);
+      expect(t, startsWith('Pada 3 foto'), reason: w.code);
+      expect(t, isNot(contains('peringatan pengukuran (')), reason: '${w.code} falls back to the generic text');
+      expect(t.toLowerCase(), isNot(matches(RegExp(r'\baman\b'))));
+    }
+  });
+
   test('classification and warning wording never contains "aman" and matches 5.6', () {
     for (final c in TrendClass.values) {
       expect(Strings.trendClass(c).toLowerCase(), isNot(contains('aman')));

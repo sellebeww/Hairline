@@ -157,6 +157,11 @@ void main() {
     rejects('a width far from nominal (unit mistake)', csv(['V1-1,100,0.01', ...ok.skip(1)]), 'nominal');
     rejects('an uncertainty above 1 mm', csv(['V1-1,0.1,2', ...ok.skip(1)]), 'u_mm');
     rejects('a width of 0.3 times nominal minus a hair', csv(['V1-8,0.5,0.01', ...ok.skip(1)]), 'nominal');
+    rejects('NaN as a width', csv(['V1-1,NaN,0.01', ...ok.skip(1)]), 'bukan angka');
+    rejects('NaN as an uncertainty', csv(['V1-1,0.11,NaN', ...ok.skip(1)]), 'bukan angka');
+    rejects('Infinity', csv(['V1-1,Infinity,0.01', ...ok.skip(1)]), 'bukan angka');
+    rejects('a hexadecimal or exponent number', csv(['V1-1,0x1F,0.01', ...ok.skip(1)]), 'bukan angka');
+    rejects('a spreadsheet formula in the position column', csv(['=cmd|calc,0.1,0.01', ...ok.skip(1)]), 'tidak dikenal');
     rejects('too few lines', csv(ok.take(7)), 'Minimal 8');
     rejects('too many rows', csv([for (var i = 0; i < 65; i++) ok.first]), 'Terlalu banyak');
     rejects('a file over 8 KB', '${csv(ok)}${' ' * 9000}', 'terlalu besar');

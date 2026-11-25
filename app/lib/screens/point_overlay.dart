@@ -4,7 +4,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:hairline_core/hairline_core.dart';
 
-/// Half length of the averaged crack segment (the 4 mm of 5.3), in mm at print scale 1.
+/// Half length of the averaged crack segment: the 4 mm of 5.3, physical mm on the sheet plane
+/// (the homography is built with the print scale, so it is NOT scaled again here).
 const double segmentHalfMm = 2;
 
 /// Image pixel polygon of a square of half size [halfMm] (print scaled) around the window centre.
@@ -14,9 +15,9 @@ List<Pt> projectSquare(Mat3 h, double halfMm, double printScale) {
 }
 
 /// Image pixel ends of the 4 mm segment through [pointMm] along [directionDeg].
-(Pt, Pt) projectSegment(Mat3 h, Pt pointMm, double directionDeg, double printScale) {
+(Pt, Pt) projectSegment(Mat3 h, Pt pointMm, double directionDeg) {
   final a = directionDeg * pi / 180;
-  final d = Pt(cos(a), sin(a)) * (segmentHalfMm * printScale);
+  final d = Pt(cos(a), sin(a)) * segmentHalfMm;
   return (applyHomography(h, pointMm - d), applyHomography(h, pointMm + d));
 }
 
@@ -68,7 +69,7 @@ final class PointOverlayPainter extends CustomPainter {
 
     final p = pointMm, d = directionDeg;
     if (p == null || d == null) return;
-    final (s0, s1) = projectSegment(h, p, d, printScale);
+    final (s0, s1) = projectSegment(h, p, d);
     final halo = Paint()
       ..color = const Color(0xFF000000)
       ..strokeWidth = 7

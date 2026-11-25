@@ -242,6 +242,21 @@ void main() {
       expect(_allText(tester).toLowerCase(), isNot(matches(RegExp(r'\baman\b'))));
     });
 
+    testWidgets('cautions raised by some frames are shown with their counts (misfit, slipped sheet, ...), none when no frame raised any', (tester) async {
+      await boot(tester, '/result/1', seed: () async {
+        final repo = c.read(hairlineRepositoryProvider);
+        final id = await seedCrack(repo);
+        await seedVisit(repo, id, ts: DateTime.utc(2026, 11, 2), kind: 'baseline', width: 0.6);
+        await seedVisit(repo, id, ts: DateTime.utc(2026, 11, 9), width: 0.6, frameWarnings: {'TRACKING_OFFSET': 4, 'MODEL_MISFIT': 1});
+      });
+      expect(find.textContaining('mungkin bergeser'), findsNothing);
+      router.go('/result/2');
+      await settle(tester);
+      expect(find.text(Strings.measureWarning('TRACKING_OFFSET', 4)), findsOneWidget);
+      expect(find.text(Strings.measureWarning('MODEL_MISFIT', 1)), findsOneWidget);
+      expect(find.textContaining('seri pengukuran terputus'), findsOneWidget);
+    });
+
     testWidgets('below the floor: no width number; not measurable: reason shown, no number', (tester) async {
       await boot(tester, '/result/1', seed: () async {
         final repo = c.read(hairlineRepositoryProvider);
@@ -370,13 +385,15 @@ void main() {
       expect(w[2].x - w[0].x, closeTo(350, 1e-9));
       final z = projectSquare(h, measurementZoneHalfMm, 1);
       expect(z[2].x - z[0].x, closeTo(250, 1e-9));
-      final (a, b) = projectSegment(h, const Pt(0, 0), 0, 1);
+      final (a, b) = projectSegment(h, const Pt(0, 0), 0);
       expect(b.x - a.x, closeTo(20, 1e-9), reason: '4 mm x 5 px/mm');
       expect(a.y, closeTo(400, 1e-9));
-      final (c1, c2) = projectSegment(h, const Pt(0, 0), 90, 1);
+      final (c1, c2) = projectSegment(h, const Pt(0, 0), 90);
       expect(c2.y - c1.y, closeTo(20, 1e-9));
-      final (s1, s2) = projectSegment(h, const Pt(0, 0), 0, 0.5);
-      expect(s2.x - s1.x, closeTo(10, 1e-9), reason: 'print scale shrinks the segment');
+      // The homography already carries the print scale, so the segment is 4 physical mm whatever
+      // the print scale (phase 9 audit: it used to be scaled twice).
+      final (s1, s2) = projectSegment(h, const Pt(0, 0), 0);
+      expect(s2.x - s1.x, closeTo(20, 1e-9));
     });
   });
 

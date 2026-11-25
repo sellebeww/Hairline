@@ -141,7 +141,7 @@ void analyze({required String framesDir, int calReps = 5}) {
       : '\n**Tidak ada `rho` yang memenuhi kriteria** sampai ${_candidates.last}. Lihat bagian 6 (kondisi tidak andal).\n');
 
   w('## 3. Cakupan sebelum dan sesudah kalibrasi\n');
-  w('Per lebar, semua kondisi lain dipool (kunjungan TERUKUR). Sebelum: `rho = 1`. Sesudah: `rho = $rho`. Kolom "pada U/2" mengukur kekonservatifan: bila cakupan fit pada setengah lebar interval masih tinggi, interval lebih dari dua kali lebih lebar daripada yang dibutuhkan (aman tetapi mengurangi daya deteksi tren).\n');
+  w('Per lebar, semua kondisi lain dipool (kunjungan TERUKUR). Sebelum: `rho = 1`. Sesudah: `rho = $rho`. Kolom "pada U/2" mengukur kekonservatifan: bila cakupan fit pada setengah lebar interval masih tinggi, interval lebih dari dua kali lebih lebar daripada yang dibutuhkan (konservatif, tetapi mengurangi daya deteksi tren).\n');
   w(_table(
     ['lebar (mm)', 'TERUKUR', 'fit sebelum (%)', 'fit sesudah (%)', 'fit ketat sebelum (%)', 'fit ketat sesudah (%)', 'fit sesudah pada U/2 (%)', 'acak sebelum (%)', 'acak sesudah (%)', 'bawaan sebelum (%)', 'bawaan sesudah (%)'],
     [

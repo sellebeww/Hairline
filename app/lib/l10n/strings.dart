@@ -256,6 +256,23 @@ abstract final class Strings {
   static const componentsTitle = 'Rincian ketidakpastian (mm, ketidakpastian baku)';
   static const resultPhotoTitle = 'Foto terbaik kunjungan ini';
   static const resultPhotoMissing = 'Foto tidak dapat ditampilkan.';
+  /// Caution for a measurement warning code that some kept frames raised (MeasureWarning.code).
+  static String measureWarning(String code, int frames) {
+    final n = '$frames foto';
+    return switch (code) {
+      'MODEL_MISFIT' => 'Pada $n profil retak tidak sesuai model (tepi kasar, bayangan, atau noda); foto itu tidak dipakai.',
+      'ALIGNMENT_FALLBACK' => 'Pada $n garis tengah retak sulit dilacak; ketidakpastian lebar bisa kurang dapat dipercaya.',
+      'PARAMETER_AT_BOUND' =>
+        'Pada $n penyesuaian model mentok di batasnya (mis. ada retak lain berdekatan); lebar kurang dapat dipercaya.',
+      'FEW_PSF_EDGES' => 'Pada $n tepi penanda untuk menaksir keburaman kurang dari enam; ketidakpastian akibat keburaman kurang pasti.',
+      'WIDTH_BEYOND_VALIDATED' =>
+        'Pada $n lebar melebihi ${num(maxValidatedWidthMm, 1)} mm, di luar rentang yang diuji pada simulasi; angka kurang dapat dipercaya.',
+      'TRACKING_OFFSET' => 'Pada $n retak ditemukan lebih dari ${num(maxTrackingOffsetMm, 1)} mm dari titik ukur tersimpan. '
+          'Lembar mungkin bergeser sejak kunjungan dasar. Jika lembar bergeser atau dilepas, seri pengukuran terputus dan harus dimulai baru.',
+      _ => 'Pada $n ada peringatan pengukuran ($code).',
+    };
+  }
+
   static const resultBaselineNote = 'Ini kunjungan dasar. Pembanding baru tersedia setelah kunjungan lanjutan.';
   static String componentLabel(String key) => switch (key) {
         'u_fit_mean' => 'u_fit (rata-rata penyesuaian model)',

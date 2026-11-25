@@ -20,10 +20,13 @@ double studentT975(int dof) {
 
 /// Coverage factor k for 95 percent from effective degrees of freedom [dof].
 ///
-/// 1..30: linear in `1/dof` between table entries (the t quantile is close to linear
-/// in `1/dof`, error below 0.001). Above 30: linear in `1/dof` from t(30) to the
-/// normal limit at `1/dof = 0` (error below 0.003 up to dof 100, always on the
-/// conservative side). Below 1 the factor of dof 1 is used.
+/// Between table entries: linear in `1/dof`. The t quantile is convex in `1/dof`, so
+/// the chord never undercuts the truth (checked against scipy t.ppf in the phase 9
+/// audit, test/student_t_test.dart). The overshoot is largest where dof is smallest:
+/// up to 0.059 for dof 2..3 (about 1.7 percent of k), 0.011 for 3..5, 0.0013 for 5..10,
+/// below 0.001 above 10. Above 30: linear in `1/dof` from t(30) to the normal limit
+/// at `1/dof = 0` (overshoot below 0.001 up to dof 200). A visit has `dof >= n - 1 >= 2`
+/// (5.5), so dof below 2 does not occur there; the factor of dof 1 is used below 1.
 double coverageFactor(double dof) {
   if (dof.isNaN) throw ArgumentError.value(dof, 'dof', 'NaN');
   if (dof <= 1) return _t975[0];

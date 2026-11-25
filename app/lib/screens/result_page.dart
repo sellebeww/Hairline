@@ -40,6 +40,9 @@ class ResultPage extends ConsumerWidget {
             ],
             if (d.cameraFlags.contains(Strings.flagFocusNotLocked)) const Padding(padding: EdgeInsets.only(top: 8), child: Text(Strings.warnFocusNotLocked)),
             if (d.cameraFlags.contains(Strings.flagExposureNotLocked)) const Padding(padding: EdgeInsets.only(top: 8), child: Text(Strings.warnExposureNotLocked)),
+            if (a != null)
+              for (final w in a.frameWarnings.entries)
+                Padding(padding: const EdgeInsets.only(top: 8), child: Text(Strings.measureWarning(w.key, w.value))),
             if (d.isBaseline) const Padding(padding: EdgeInsets.only(top: 8), child: Text(Strings.resultBaselineNote)),
             const SectionTitle(Strings.resultPhotoTitle),
             if (d.photo == null)

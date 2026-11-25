@@ -425,6 +425,18 @@ void main() {
       expect(ok.warnings, isNot(contains(MeasureWarning.widthBeyondValidated)));
     });
 
+    test('sheet slipped between visits: a ridge 0.9 mm off the stored point is found but flagged TRACKING_OFFSET (phase 9 audit)', () {
+      final a = 20 * pi / 180;
+      final slipped = accepted(measure(crackPatch(w: 0.5), point: Pt(-0.9 * sin(a), 0.9 * cos(a))));
+      expect(slipped.trackingOffsetMm, closeTo(0.9, 0.05));
+      expect(slipped.warnings, contains(MeasureWarning.trackingOffset));
+      // within tolerance (0.3 mm: the spread of the synthetic study) no flag
+      final ok = accepted(measure(crackPatch(w: 0.5), point: Pt(-0.3 * sin(a), 0.3 * cos(a))));
+      expect(ok.warnings, isNot(contains(MeasureWarning.trackingOffset)));
+      // beyond the 1.5 mm search radius the crack is not found: rejected, never a number
+      expect(measure(crackPatch(w: 0.5), point: Pt(-2.2 * sin(a), 2.2 * cos(a))), isA<MeasureRejected>());
+    });
+
     test('a crack wider than the 3 mm design limit is flagged at the bound', () {
       final o = measure(crackPatch(w: 3.4));
       if (o is MeasureAccepted) {
