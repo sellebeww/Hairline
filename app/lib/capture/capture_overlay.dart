@@ -11,7 +11,8 @@ import 'live_analysis.dart';
 enum GuideLevel { ok, adjust, blocked }
 
 GuideLevel guideLevelOf(CaptureState s) => switch (s.phase) {
-      CapturePhase.ready || CapturePhase.result => s.outcome is VisitNotStored ? GuideLevel.adjust : GuideLevel.ok,
+      CapturePhase.ready || CapturePhase.result || CapturePhase.baselineCaptured =>
+        s.outcome is VisitNotStored ? GuideLevel.adjust : GuideLevel.ok,
       CapturePhase.adjusting || CapturePhase.burst || CapturePhase.processing => GuideLevel.adjust,
       CapturePhase.waitingForMarkers || CapturePhase.error => GuideLevel.blocked,
     };
@@ -47,6 +48,7 @@ String headlineOf(CaptureState s) => switch (s.phase) {
       CapturePhase.ready => Strings.statusReady,
       CapturePhase.burst => Strings.statusBurst,
       CapturePhase.processing => Strings.statusProcessing,
+      CapturePhase.baselineCaptured => Strings.statusBaselineCaptured,
       CapturePhase.result => s.outcome is VisitStored ? Strings.statusResultStored : Strings.statusResultRejected,
       CapturePhase.error => Strings.statusError,
     };

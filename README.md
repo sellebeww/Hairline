@@ -2,7 +2,7 @@
 
 Longitudinal crack-width monitoring for non-professionals, Android first (Flutter). A printed ArUco marker frame is glued around a crack. On each visit the app guides the phone pose, rectifies the image to the sheet plane with a homography, measures the crack width at one marked point with a sub-pixel profile model, computes an uncertainty budget, and compares the result with earlier visits. A change is flagged only when it exceeds the measurement uncertainty.
 
-Status: Phase 1 (repository, toolchain, opencv_dart spike). No measurement features yet. See [docs/PROGRESS.md](docs/PROGRESS.md).
+Status: Phase 7 (sheet PDF, guided setup, screens, trend) done on synthetic data; real camera, OpenCV detection on device and plate validation are not yet verified (docs/DEVICE_TEST.md). See [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ## Layout
 

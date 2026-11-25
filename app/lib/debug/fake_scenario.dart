@@ -64,9 +64,9 @@ LumaFrame _liveFrame(SyntheticCamera cam, Random rng, {Set<int> omit = const {},
 }
 
 /// Builds the recording. With [renderCrack] the stills carry a rendered crack of
-/// [demoCrackWidthMm] (about 15 s of CPU: run it in an isolate); without, they are flat
+/// [crackWidthMm] (about 15 s of CPU: run it in an isolate); without, they are flat
 /// gray and the quality gate rejects them ("retak tidak ditemukan").
-FakeScenario buildFakeScenario({bool renderCrack = true, int seed = 11, int stills = 6}) {
+FakeScenario buildFakeScenario({bool renderCrack = true, int seed = 11, int stills = 6, double crackWidthMm = demoCrackWidthMm}) {
   final rng = Random(seed);
   final target = demoTargetCamera();
   final live = <LumaFrame>[
@@ -78,7 +78,7 @@ FakeScenario buildFakeScenario({bool renderCrack = true, int seed = 11, int stil
   final gray = renderCrack
       ? srgbBytes(renderSheetPhoto(
           camera: target,
-          crackWidthMm: demoCrackWidthMm,
+          crackWidthMm: crackWidthMm,
           crackDirectionDeg: demoCrackDirectionDeg,
           noiseSigma: 0.004,
           rng: Random(seed),

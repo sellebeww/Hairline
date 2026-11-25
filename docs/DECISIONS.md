@@ -211,3 +211,22 @@ Format: tanggal, masalah, keputusan, alasan. Semua tanggal 2026-11-17 (Fase 1).
 - Temuan nyata dari tes ujung ke ujung: (1) provider auto-dispose yang hanya di-`read` oleh controller dilepas setelah await pertama sehingga kamera ditutup tepat setelah dibuka; diperbaiki dengan `ref.watch` di `build`. (2) `ref` mati setelah layar ditutup padahal `_start` masih berjalan; semua `ref.read` dipindah sebelum await pertama dan `ref.mounted` diperiksa. (3) Tanpa penjaga, galat query setelah layar ditutup menjadi galat tak tertangani; kini dilaporkan hanya jika layar masih ada.
 - Sapuan berkas yatim `sweepOrphanFrames` dipanggil saat start (`main.dart`), menutup catatan D38.
 - Dependensi: tidak ada paket baru (`camera` sudah ada sejak Fase 1; kanal platform memakai `flutter/services`).
+
+## D43. Fase 7: titik ukur ditentukan setelah foto dasar (2026-11-25)
+- Masalah: skema 5.7 menyimpan tepat satu `crack_points` per retak dan pipeline mengukur di titik itu, tetapi titik baru dipilih pengguna pada foto dasar. Retak dibuat dengan titik sementara (pusat jendela, arah 0) karena `createCrack` menulis retak dan titik dalam satu transaksi.
+- Keputusan: kunjungan dasar dua tahap. (1) `VisitProcessor.gateBaseline` menjalankan tiap foto lewat pipeline di titik sementara; foto lolos bila geometri lolos dan satu-satunya kekurangan adalah retak belum ditemukan (`crackNotFound`); blur, jenuh, PSF, geometri tetap menolak. Minimal 3 foto lolos, foto disimpan hanya di memori (`PendingBaselines`), tidak ada tulisan ke database atau berkas. (2) Layar titik ukur: ketuk, `locateCrackPoint` (core) mencoba 12 arah dalam radius 3 mm lalu menyempurnakan dengan radius 1,5 mm, titik harus di dalam zona 50 x 50 mm; konfirmasi memanggil `storeBaseline`: `updateCrackPoint` (ditolak bila sudah ada kunjungan) lalu `processBurst` penuh (gerbang 5.4, agregasi 5.5) dengan jalur yang sama seperti kunjungan lain.
+- Alasan: titik ukur nyata dan hasil ujung ke ujung tidak bergantung pada logika baru; harga: foto dasar diproses dua kali (sekitar 6 x 1 detik tambahan di ponsel, belum diukur). Bila aplikasi ditutup sebelum konfirmasi, foto dasar hilang dan diambil ulang (tidak ada data setengah jadi).
+- Posisi titik hasil ketukan adalah titik pada garis tengah retak terdekat dari ketukan; titik sepanjang retak tidak penting karena terukur adalah rata-rata segmen 4 mm.
+
+## D44. Fase 7: lembar PDF dan tabel penanda
+- Tabel bit `DICT_4X4_50` id 0..47 dihasilkan sekali oleh `tools/gen_aruco_table.py` (OpenCV 5.0.0 Python) menjadi konstanta `aruco4x4Bits` di core (16 bit per penanda, baris demi baris). Tata letak lembar adalah primitif mm murni di core (`buildSheetLayout`); `buildSheetPdf` di app hanya memetakannya ke operator PDF (vektor, font standar Helvetica, teks Latin-1).
+- Bukti: core menguji raster primitif dibaca balik menjadi id yang benar pada posisi 5.1 untuk A4 dan Letter, id tak ambigu pada 4 rotasi, dimensi mm (30, 70, 100, tanda 6, celah 10); app menguji MediaBox dan persegi `re` di aliran konten PDF tak terkompresi (30 mm). Pemeriksaan dengan detektor ArUco OpenCV nyata: `tools/verify_sheet_raster.py` pada 24 lembar (12 id x 2 kertas): semua id terdeteksi, galat sudut terburuk 0,056 mm (raster 10 px/mm; OpenCV Python di host, BUKAN opencv_dart; tidak dijadikan tes otomatis karena butuh venv Python). Cetak nyata: DEVICE_TEST bagian 10.
+- Tata letak: pusat jendela 100 mm dari atas halaman, batang skala 90 mm di bawah pusat (D Fase 3), margin >= 15 mm.
+
+## D45. Fase 7: layar, data, dan keputusan kecil
+- Pembacaan data layar memakai `FutureProvider.autoDispose` tulisan tangan (`screens/queries.dart`) karena `riverpod_generator` tidak dapat me-resolve kelas baris Drift (dihasilkan di langkah lain build_runner). Ref tidak dipakai setelah `await`.
+- Hasil tiap kunjungan: agregat versi algoritma saat ini bila ada, selain itu yang terbaru. Tren memberi peringatan `ALGORITHM_VERSION_DIFFERS` bila versi berbeda dan tombol "proses ulang" bagi kunjungan tanpa versi saat ini; hasil lama tidak dihapus.
+- Label `BELUM_DIVALIDASI` selalu tampil bila tidak ada tanda `belum_divalidasi=false` di anggaran (default aman); saat ini tidak ada jalur validasi PERANGKAT, jadi selalu tampil.
+- Grafik: sumbu x sebanding waktu, batang `w +- U`, bentuk penanda berbeda per klasifikasi (bukan hanya warna); kunjungan tanpa angka diberi silang di sumbu. Tanpa regresi atau ekstrapolasi.
+- Tidak ada paket baru. Versi aplikasi `1.0.0` dijaga sama dengan pubspec oleh tes.
+- Layar sesuai daftar Fase 7; tidak ada layar validasi pelat (Fase berikutnya).

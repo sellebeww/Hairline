@@ -6,17 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'capture/capture_controller.dart';
-import 'capture/capture_page.dart';
-import 'debug/demo_seed.dart';
 import 'debug/embedded_ports.dart';
 import 'debug/fake_scenario.dart';
 import 'l10n/strings.dart';
+import 'main.dart';
 import 'providers.dart';
 
-/// Debug entry point: the whole capture flow on a scripted fake camera and synthetic
-/// photos, no camera and no OpenCV needed. Run with `flutter run -t lib/main_fake.dart`.
-/// The first shot is the baseline visit; after "Ulangi" the next one is a follow-up
-/// guided by the ghost outline of the stored pose.
+/// Debug entry point: the whole app on a scripted fake camera and synthetic photos, no
+/// camera and no OpenCV needed. Run with `flutter run -t lib/main_fake.dart`. Add a site and
+/// a crack (any ruler reading), then take the baseline: the first shot becomes the baseline
+/// photo, tap the crack near the window centre (the simulated crack runs through it at
+/// 25 degrees); every next visit is a follow-up guided by the ghost outline. All photos are
+/// the same simulated 0.6 mm crack, so the trend will read "no change detected".
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MaterialApp(
@@ -35,27 +36,6 @@ Future<void> main() async {
         return camera;
       }),
     ],
-    child: const _SimApp(),
+    child: const HairlineApp(),
   ));
-}
-
-class _SimApp extends ConsumerStatefulWidget {
-  const _SimApp();
-
-  @override
-  ConsumerState<_SimApp> createState() => _SimAppState();
-}
-
-class _SimAppState extends ConsumerState<_SimApp> {
-  late final Future<int> _crack = seedDemoCrack(ref.read(hairlineRepositoryProvider), directionDeg: demoCrackDirectionDeg);
-
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'Hairline (simulasi)',
-        home: FutureBuilder<int>(
-          future: _crack,
-          builder: (context, snap) =>
-              snap.hasData ? CapturePage(crackId: snap.data!) : const Scaffold(body: Center(child: CircularProgressIndicator())),
-        ),
-      );
 }

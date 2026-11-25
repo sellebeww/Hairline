@@ -13,6 +13,7 @@ import 'pose.dart';
 import 'psf.dart';
 import 'quality.dart';
 import 'rejection.dart';
+import 'ridge.dart';
 import 'sheet.dart';
 import 'uncertainty.dart';
 
@@ -272,4 +273,127 @@ GrayPatch? _extract(DecodedImage image, ImageSize size, Mat3 h, Pt centerMm, dou
   final y0 = max(0, ys.reduce(min).floor() - _rectPadPx), y1 = min(size.height - 1, ys.reduce(max).ceil() + _rectPadPx);
   if (x1 - x0 + 1 < 4 || y1 - y0 + 1 < 4) return null;
   return image.extractPatch(x0, y0, x1 - x0 + 1, y1 - y0 + 1).linearizedFromSrgb();
+}
+
+/// Outcome of [locateCrackPoint]: the sheet-to-image homography of the photo (for the
+/// overlay) and, when a tap was given and a crack ridge was found near it, the snapped
+/// measurement point and its direction.
+final class PointLocation {
+  const PointLocation({
+    required this.size,
+    this.h,
+    this.markerCount = 0,
+    this.pointMm,
+    this.directionDeg,
+    this.snr,
+    this.message,
+  });
+
+  final ImageSize size;
+
+  /// Sheet to image; null when no homography could be estimated (see [message]).
+  final Mat3? h;
+  final int markerCount;
+
+  /// Snapped point on the crack centreline (sheet mm), and crack direction in `(-90, 90]`.
+  final Pt? pointMm;
+  final double? directionDeg;
+
+  /// Ridge strength (signal over noise); larger is clearer.
+  final double? snr;
+
+  /// Specific user message (Indonesian) when [h] or [pointMm] is missing.
+  final String? message;
+
+  bool get located => pointMm != null;
+}
+
+/// Radius (mm) around a tap in which the crack ridge is searched. A fingertip is far less
+/// exact than the 1.5 mm tracking radius of later visits.
+const double tapSearchRadiusMm = 3;
+
+const int _directionTrials = 12;
+
+/// Places the measurement point from a tap (CLAUDE.md 5.3 "Penjejakan", baseline visit).
+///
+/// Decodes [encoded], estimates the homography, converts [tapPx] (pixels of the decoded
+/// photo) to sheet mm, tries 12 crack directions with `findRidge` within
+/// [tapSearchRadiusMm], keeps the strongest ridge and refines its centre and direction
+/// once more with the usual 1.5 mm radius. Without [tapPx] only the homography is
+/// returned (for drawing the overlay). The point must end up inside the central 50 x 50 mm.
+PointLocation locateCrackPoint({
+  required Uint8List encoded,
+  required FramePorts ports,
+  required int sheetId,
+  required double printScale,
+  Pt? tapPx,
+}) {
+  final DecodedImage image;
+  try {
+    image = ports.source.decode(encoded);
+  } on FrameDecodeException {
+    return PointLocation(size: const ImageSize(0, 0), message: FrameRejection.imageUnreadable.message);
+  }
+  try {
+    final size = ImageSize(image.width, image.height);
+    final detections = ports.detector.detect(image);
+    final HomographyEstimate est;
+    try {
+      est = estimateSheetHomography(detections, sheetId: sheetId, printScale: printScale);
+    } on TooFewMarkersException {
+      return PointLocation(size: size, message: FrameRejection.tooFewMarkers.message);
+    } on HomographyException {
+      return PointLocation(size: size, message: FrameRejection.homographyFailed.message);
+    }
+    PointLocation fail(String m) => PointLocation(size: size, h: est.h, markerCount: est.markerCount, message: m);
+    if (tapPx == null) return PointLocation(size: size, h: est.h, markerCount: est.markerCount);
+
+    final tapMm = est.unproject(tapPx);
+    if (!isInsideMeasurementZone(tapMm, printScale: printScale)) {
+      return fail('Ketukan berada di luar area ukur. Ketuk retak di dalam jendela, dekat bagian tengah.');
+    }
+    final patch = _extract(image, size, est.h, tapMm, crackPatchHalfMm * printScale);
+    if (patch == null) return fail('Titik yang diketuk berada di luar foto.');
+
+    RidgeResult? first;
+    for (var i = 0; i < _directionTrials; i++) {
+      try {
+        final r = findRidge(
+          patch: patch,
+          h: est.h,
+          pointMm: tapMm,
+          directionDeg: i * 180.0 / _directionTrials,
+          searchRadiusMm: tapSearchRadiusMm * printScale,
+        );
+        if (first == null || r.snr > first.snr) first = r;
+      } on MeasurementException catch (e) {
+        if (e.reason != RejectReason.crackNotFound) rethrow;
+      }
+    }
+    if (first == null) {
+      return fail('Retak tidak ditemukan di dekat ketukan. Ketuk tepat di atas retak, atau foto kurang jelas.');
+    }
+    // Second pass: the direction is now known, so the search is the usual one.
+    var best = first;
+    try {
+      best = findRidge(patch: patch, h: est.h, pointMm: first.centerMm, directionDeg: first.directionDeg);
+    } on MeasurementException catch (e) {
+      if (e.reason != RejectReason.crackNotFound) rethrow;
+    }
+    if (!isInsideMeasurementZone(best.centerMm, printScale: printScale)) {
+      return fail('Retak terdeteksi, tetapi di luar area ukur 50 x 50 mm. Pilih bagian retak yang lebih dekat ke tengah jendela.');
+    }
+    var dir = best.directionDeg % 180;
+    if (dir > 90) dir -= 180;
+    return PointLocation(
+      size: size,
+      h: est.h,
+      markerCount: est.markerCount,
+      pointMm: best.centerMm,
+      directionDeg: dir,
+      snr: best.snr,
+    );
+  } finally {
+    image.dispose();
+  }
 }

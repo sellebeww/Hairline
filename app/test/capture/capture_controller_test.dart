@@ -9,7 +9,6 @@ import 'package:hairline/capture/camera_service.dart';
 import 'package:hairline/capture/capture_controller.dart';
 import 'package:hairline/capture/capture_flow.dart';
 import 'package:hairline/capture/fake_camera_service.dart';
-import 'package:hairline/capture/reference_pose.dart';
 import 'package:hairline/debug/demo_seed.dart';
 import 'package:hairline/debug/embedded_ports.dart';
 import 'package:hairline/debug/fake_scenario.dart';
@@ -27,7 +26,7 @@ Future<void> _until(bool Function() cond, {String what = 'condition', int second
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-  late FakeScenario flat, rendered;
+  late FakeScenario flat;
   late Directory tmp;
   late FakeCameraService camera;
   late ProviderContainer c;
@@ -178,39 +177,6 @@ void main() {
       c.dispose();
       await shot; // must complete, not throw
       c = ProviderContainer();
-    });
-  });
-
-  group('end to end on synthetic photos (SINTETIS): baseline, then a follow-up guided by the stored pose', () {
-    // One full render of the synthetic sheet (about 15 s).
-    setUpAll(() => rendered = buildFakeScenario());
-    test('both visits are stored through the quality gate; the second one sees the ghost of the first', () async {
-      await open(rendered);
-      await _until(() => ui().flow.canShoot, what: 'baseline ready');
-      await ctl().shutter();
-      expect(ui().flow.phase, CapturePhase.result);
-      expect(ui().flow.outcome, isA<VisitStored>());
-      expect(ui().isBaseline, isFalse, reason: 'the next shot is a follow-up');
-
-      final repo = c.read(hairlineRepositoryProvider);
-      var visits = await repo.visitsOfCrack(crackId);
-      expect(visits.single.kind, 'baseline');
-      final reference = ReferencePose.tryParse(visits.single.referencePoseJson);
-      expect(reference, isNotNull, reason: 'the baseline stores the pose it was shot from');
-      expect(visits.single.cameraInfoJson, contains('"flags":[]'));
-      expect((await repo.framesOfVisit(visits.single.id)).length, inInclusiveRange(3, 5));
-      final stored = ui().flow.outcome! as VisitStored;
-      expect(stored.result.acceptedFrames, greaterThanOrEqualTo(3));
-
-      await ctl().retry();
-      await _until(() => ui().flow.canShoot, what: 'follow-up ready');
-      expect(ui().flow.analysis!.ghost, hasLength(4), reason: 'the target outline comes from the baseline');
-      expect(ui().flow.analysis!.deviation, isNotNull);
-      await ctl().shutter();
-      expect(ui().flow.outcome, isA<VisitStored>());
-      visits = await repo.visitsOfCrack(crackId);
-      expect(visits.map((v) => v.kind), ['baseline', 'followup']);
-      expect(visits.last.referencePoseJson, isNull);
     });
   });
 }

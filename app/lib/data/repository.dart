@@ -136,6 +136,31 @@ class HairlineRepository {
             );
       });
 
+  Future<List<Site>> allSites() => (_db.select(_db.sites)..orderBy([(s) => OrderingTerm.asc(s.name), (s) => OrderingTerm.asc(s.id)])).get();
+
+  Future<Site?> site(int id) => (_db.select(_db.sites)..where((s) => s.id.equals(id))).getSingleOrNull();
+
+  Future<List<Crack>> cracksOfSite(int siteId) =>
+      (_db.select(_db.cracks)
+            ..where((c) => c.siteId.equals(siteId))
+            ..orderBy([(c) => OrderingTerm.asc(c.createdAt), (c) => OrderingTerm.asc(c.id)]))
+          .get();
+
+  Future<Crack?> crack(int id) => (_db.select(_db.cracks)..where((c) => c.id.equals(id))).getSingleOrNull();
+
+  /// Moves the single measurement point of a crack that has no visit yet (the baseline
+  /// visit chooses it, 5.7). Refused afterwards: every visit is measured at the same
+  /// physical point, moving it would break the series.
+  Future<void> updateCrackPoint({required int crackId, required Pt pointMm, required double directionDeg}) =>
+      _db.transaction(() async {
+        final visits = await (_db.select(_db.visits)..where((v) => v.crackId.equals(crackId))).get();
+        if (visits.isNotEmpty) throw const RepositoryException('Titik ukur tidak dapat diubah setelah kunjungan tersimpan.');
+        final ctx = await crackContext(crackId);
+        await (_db.update(_db.crackPoints)..where((p) => p.id.equals(ctx.point.id))).write(
+          CrackPointsCompanion(xMm: Value(pointMm.x), yMm: Value(pointMm.y), directionDeg: Value(directionDeg)),
+        );
+      });
+
   Future<CrackContext> crackContext(int crackId) async {
     final crack = await (_db.select(_db.cracks)..where((c) => c.id.equals(crackId))).getSingleOrNull();
     if (crack == null) throw const RepositoryException('Retak tidak ditemukan.');

@@ -5,7 +5,18 @@ import '../pipeline/visit_processor.dart';
 import 'live_analysis.dart';
 
 /// Where the capture flow is. Exactly one phase at a time.
-enum CapturePhase { waitingForMarkers, adjusting, ready, burst, processing, result, error }
+enum CapturePhase {
+  waitingForMarkers,
+  adjusting,
+  ready,
+  burst,
+  processing,
+
+  /// Baseline only: the photos passed the geometry gate, the measurement point comes next.
+  baselineCaptured,
+  result,
+  error,
+}
 
 /// Tunable values of the flow (starting values, not tuned on a device).
 @immutable
@@ -111,6 +122,11 @@ final class ProcessedEvent extends CaptureEvent {
   final VisitOutcome outcome;
 }
 
+/// The baseline burst passed the geometry gate and waits in memory for the measurement point.
+final class BaselineGatedEvent extends CaptureEvent {
+  const BaselineGatedEvent();
+}
+
 final class FailedEvent extends CaptureEvent {
   const FailedEvent(this.message);
   final String message;
@@ -195,11 +211,20 @@ CaptureState reduceCapture(CaptureState s, CaptureEvent e, {FlowConfig config = 
         processDone: s.processTotal,
         processTotal: s.processTotal,
       );
+    case BaselineGatedEvent():
+      if (s.phase != CapturePhase.processing) return s;
+      return CaptureState(
+        phase: CapturePhase.baselineCaptured,
+        analysis: s.analysis,
+        flags: s.flags,
+        processDone: s.processTotal,
+        processTotal: s.processTotal,
+      );
     case FailedEvent(:final message):
       if (s.phase == CapturePhase.error) return s;
       return CaptureState(phase: CapturePhase.error, analysis: s.analysis, error: message, flags: s.flags);
     case RetryEvent():
-      if (s.phase != CapturePhase.result && s.phase != CapturePhase.error) return s;
+      if (s.phase != CapturePhase.result && s.phase != CapturePhase.error && s.phase != CapturePhase.baselineCaptured) return s;
       return const CaptureState();
   }
 }

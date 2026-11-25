@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'l10n/strings.dart';
 import 'providers.dart';
 import 'router.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,5 +34,5 @@ class HairlineApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
-      MaterialApp.router(title: 'Hairline', routerConfig: ref.watch(routerProvider));
+      MaterialApp.router(title: Strings.appName, theme: buildTheme(), routerConfig: ref.watch(routerProvider));
 }

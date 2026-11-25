@@ -16,6 +16,7 @@ import 'capture_flow.dart';
 import 'detection_worker.dart';
 import 'device_camera_service.dart';
 import 'lens_info.dart';
+import 'pending_baseline.dart';
 import 'live_analysis.dart';
 import 'reference_pose.dart';
 
@@ -86,7 +87,6 @@ class CaptureController extends _$CaptureController {
   Timer? _tick;
   CancelToken? _cancel;
   CameraSetup? _setup;
-  LiveAnalyzer Function(ReferencePose?)? _makeAnalyzer;
   ReferencePose? _reference;
 
   @override
@@ -140,16 +140,15 @@ class CaptureController extends _$CaptureController {
       final setup = await camera.initialize();
       _setup = setup;
       if (_disposed) return;
-      _makeAnalyzer = (reference) => LiveAnalyzer(
+      _analyzer = LiveAnalyzer(
             sheetId: crack.crack.sheetId,
             printScale: crack.crack.printScale,
             pointMm: Pt(crack.point.xMm, crack.point.yMm),
             quarterTurns: setup.quarterTurns,
-            reference: reference,
+            reference: _reference,
             focalMm: setup.lens.focalLengthMm,
             sensorLongSideMm: setup.lens.sensorLongSideMm,
           );
-      _analyzer = _makeAnalyzer!(_reference);
       final worker = await DetectionWorker.start(detectorFactory);
       _worker = worker;
       if (_disposed) {
@@ -205,6 +204,7 @@ class CaptureController extends _$CaptureController {
     final analysis = flow.analysis;
     if (!flow.canShoot || camera == null || setup == null || analysis == null) return;
     final processor = ref.read(visitProcessorProvider);
+    final pendings = ref.read(pendingBaselinesProvider.notifier);
     final baseline = state.isBaseline;
     // The reference of the baseline visit is the pose of the frame that made the shutter ready.
     final reference = baseline ? LiveAnalyzer.referenceFrom(analysis) : null;
@@ -225,24 +225,40 @@ class CaptureController extends _$CaptureController {
     _dispatch(BurstDoneEvent(photoCount: burst.photos.length, flags: burst.locks.flags));
 
     final cancel = _cancel = CancelToken();
+    void progress(int done, int total) => _dispatch(ProcessProgressEvent(done, total));
     try {
-      final outcome = await processor.processBurst(
-            crackId: _crackId,
-            photos: burst.photos,
-            deviceModel: setup.lens.deviceModel,
-            camera: setup.lens.toCameraInfo(flags: burst.locks.flags),
-            kind: baseline ? 'baseline' : 'followup',
-            referencePoseJson: reference?.toJsonString(),
-            cancel: cancel,
-            onProgress: (done, total) => _dispatch(ProcessProgressEvent(done, total)),
-          );
-      if (_disposed) return;
-      if (outcome is VisitStored && baseline && reference != null) {
-        // The next shot on this screen is a follow-up: guide it with the pose just stored.
-        _reference = reference;
-        _analyzer = _makeAnalyzer?.call(reference);
-        state = state.copyWith(isBaseline: false);
+      if (baseline) {
+        // No measurement point exists yet: only the geometry is gated; the point is
+        // chosen on the best photo next and the visit is stored from there.
+        final gate = await processor.gateBaseline(
+          crackId: _crackId,
+          photos: burst.photos,
+          deviceModel: setup.lens.deviceModel,
+          camera: setup.lens.toCameraInfo(flags: burst.locks.flags),
+          referencePoseJson: reference?.toJsonString(),
+          cancel: cancel,
+          onProgress: progress,
+        );
+        if (_disposed) return;
+        switch (gate) {
+          case BaselineGateOpen(:final pending):
+            pendings.put(pending);
+            _dispatch(const BaselineGatedEvent());
+          case BaselineGateClosed(:final outcome):
+            _dispatch(ProcessedEvent(outcome));
+        }
+        return;
       }
+      final outcome = await processor.processBurst(
+        crackId: _crackId,
+        photos: burst.photos,
+        deviceModel: setup.lens.deviceModel,
+        camera: setup.lens.toCameraInfo(flags: burst.locks.flags),
+        kind: 'followup',
+        cancel: cancel,
+        onProgress: progress,
+      );
+      if (_disposed) return;
       _dispatch(ProcessedEvent(outcome));
     } on VisitCancelledException {
       return;

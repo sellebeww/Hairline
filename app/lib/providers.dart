@@ -5,11 +5,15 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:hairline_core/hairline_core.dart' show measurementAlgorithmVersion;
+
 import 'data/database.dart';
 import 'data/frame_storage.dart';
 import 'data/repository.dart';
 import 'pipeline/frame_processor.dart';
+import 'pipeline/point_locator.dart';
 import 'pipeline/visit_processor.dart';
+import 'sheet/sheet_output.dart';
 
 part 'providers.g.dart';
 
@@ -45,7 +49,19 @@ FrameProcessor frameProcessor(Ref ref) {
 }
 
 @Riverpod(keepAlive: true)
+SheetOutput sheetOutput(Ref ref) => const PrintingSheetOutput();
+
+@Riverpod(keepAlive: true)
+PointLocator pointLocator(Ref ref) => PointLocator(ref.watch(framePortsFactoryProvider));
+
+/// Version stamped on new measurements and the one the trend screen wants every visit to have.
+/// Tests override it to simulate a newer algorithm.
+@Riverpod(keepAlive: true)
+String currentAlgorithmVersion(Ref ref) => measurementAlgorithmVersion;
+
+@Riverpod(keepAlive: true)
 VisitProcessor visitProcessor(Ref ref) => VisitProcessor(
+      algorithmVersion: ref.watch(currentAlgorithmVersionProvider),
       frames: ref.watch(frameProcessorProvider),
       repository: ref.watch(hairlineRepositoryProvider),
       storage: ref.watch(frameStorageProvider),

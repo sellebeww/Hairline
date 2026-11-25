@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Vassel Goleyu. MIT License.
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:hairline_core/hairline_core.dart';
@@ -48,6 +49,22 @@ final class CameraInfo {
 
   Map<String, Object?> toJson() =>
       {'v': 1, 'focal_mm': focalMm, 'sensor_long_side_mm': sensorLongSideMm, 'flags': flags};
+
+  /// Reads `visits.camera_info_json`; anything unreadable gives an empty (default) info.
+  factory CameraInfo.fromJsonString(String json) {
+    try {
+      final m = jsonDecode(json);
+      if (m is! Map<String, Object?>) return const CameraInfo();
+      final flags = m['flags'];
+      return CameraInfo(
+        focalMm: (m['focal_mm'] as num?)?.toDouble(),
+        sensorLongSideMm: (m['sensor_long_side_mm'] as num?)?.toDouble(),
+        flags: flags is List ? [for (final f in flags) '$f'] : const [],
+      );
+    } on FormatException {
+      return const CameraInfo();
+    }
+  }
 }
 
 /// Result of processing a burst or a stored visit.
@@ -76,6 +93,49 @@ final class VisitNotStored extends VisitOutcome {
 final class VisitReprocessed extends VisitOutcome {
   const VisitReprocessed({required super.result, required super.frames, required this.visitId});
   final int visitId;
+}
+
+/// A baseline burst that passed the geometry gate but is not stored yet: the measurement
+/// point does not exist until the user taps the crack on [bestIndex] (5.7: the point is
+/// chosen on the baseline photo). Held in memory only; nothing is written until confirmed.
+final class PendingBaseline {
+  const PendingBaseline({
+    required this.crackId,
+    required this.photos,
+    required this.bestIndex,
+    required this.deviceModel,
+    required this.camera,
+    required this.referencePoseJson,
+  });
+
+  final int crackId;
+
+  /// The photos whose geometry was accepted (the crack was not looked for yet).
+  final List<Uint8List> photos;
+
+  /// Lowest reprojection error of [photos]: the photo the user taps on.
+  final int bestIndex;
+  final String deviceModel;
+  final CameraInfo camera;
+  final String? referencePoseJson;
+
+  Uint8List get bestPhoto => photos[bestIndex];
+}
+
+sealed class BaselineGate {
+  const BaselineGate();
+}
+
+/// Enough frames passed the geometry gate: choose the measurement point next.
+final class BaselineGateOpen extends BaselineGate {
+  const BaselineGateOpen(this.pending);
+  final PendingBaseline pending;
+}
+
+/// Fewer than 3 frames passed: retake (nothing is kept).
+final class BaselineGateClosed extends BaselineGate {
+  const BaselineGateClosed(this.outcome);
+  final VisitNotStored outcome;
 }
 
 /// Turns a burst into a stored visit: frames through the isolate pipeline, `aggregateVisit`
@@ -184,6 +244,65 @@ class VisitProcessor {
       } catch (_) {}
       rethrow;
     }
+  }
+
+  /// Gate of a baseline burst, before the measurement point exists. Every photo is run
+  /// through the pipeline at the window centre; a photo counts when its geometry passes
+  /// and the only thing missing is the crack there ("crack not found" is expected: the
+  /// user has not tapped it yet). Blur, saturation or geometry failures still reject.
+  Future<BaselineGate> gateBaseline({
+    required int crackId,
+    required List<Uint8List> photos,
+    required String deviceModel,
+    CameraInfo camera = const CameraInfo(),
+    String? referencePoseJson,
+    CancelToken? cancel,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final crack = await repository.crackContext(crackId);
+    final outcomes = await _processAll(photos, _context(crack, camera), cancel, onProgress);
+    final ok = [
+      for (var i = 0; i < outcomes.length; i++)
+        if (outcomes[i].accepted || outcomes[i].input.measureRejection == RejectReason.crackNotFound) i,
+    ];
+    if (ok.length < QualityThresholds.standard.minAcceptedFrames) {
+      final result = _aggregate(outcomes, crack);
+      return BaselineGateClosed(VisitNotStored(result: result, frames: outcomes, reasons: _reasons(result, outcomes, photos.length)));
+    }
+    var best = ok.first;
+    for (final i in ok) {
+      if (outcomes[i].homography!.rmsPx < outcomes[best].homography!.rmsPx) best = i;
+    }
+    return BaselineGateOpen(PendingBaseline(
+      crackId: crackId,
+      photos: [for (final i in ok) photos[i]],
+      bestIndex: ok.indexOf(best),
+      deviceModel: deviceModel,
+      camera: camera,
+      referencePoseJson: referencePoseJson,
+    ));
+  }
+
+  /// Fixes the measurement point of a crack without visits, then stores the baseline
+  /// visit through the full gate and aggregation (the same path as any other visit).
+  Future<VisitOutcome> storeBaseline(
+    PendingBaseline pending, {
+    required Pt pointMm,
+    required double directionDeg,
+    CancelToken? cancel,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    await repository.updateCrackPoint(crackId: pending.crackId, pointMm: pointMm, directionDeg: directionDeg);
+    return processBurst(
+      crackId: pending.crackId,
+      photos: pending.photos,
+      deviceModel: pending.deviceModel,
+      camera: pending.camera,
+      kind: 'baseline',
+      referencePoseJson: pending.referencePoseJson,
+      cancel: cancel,
+      onProgress: onProgress,
+    );
   }
 
   /// Measures a stored visit again from its photos (new algorithm version, new detection,

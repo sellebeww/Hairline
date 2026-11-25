@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../l10n/strings.dart';
+import '../pipeline/visit_processor.dart';
 import 'capture_controller.dart';
 import 'capture_flow.dart';
 import 'capture_overlay.dart';
@@ -39,8 +41,19 @@ class _CapturePageState extends ConsumerState<CapturePage> with WidgetsBindingOb
     ref.read(captureControllerProvider(widget.crackId).notifier).onLifecycle(state);
   }
 
+  void _openPoint() => GoRouter.maybeOf(context)?.pushReplacement('/point/${widget.crackId}');
+
+  void _openResult() {
+    final outcome = ref.read(captureControllerProvider(widget.crackId)).flow.outcome;
+    if (outcome is VisitStored) GoRouter.maybeOf(context)?.pushReplacement('/result/${outcome.visitId}');
+  }
+
   @override
   Widget build(BuildContext context) {
+    // The baseline photos are kept in memory: go on to the measurement point at once.
+    ref.listen(captureControllerProvider(widget.crackId).select((u) => u.flow.phase), (prev, next) {
+      if (next == CapturePhase.baselineCaptured) _openPoint();
+    });
     final ui = ref.watch(captureControllerProvider(widget.crackId));
     final controller = ref.read(captureControllerProvider(widget.crackId).notifier);
     final s = ui.flow;
@@ -69,7 +82,13 @@ class _CapturePageState extends ConsumerState<CapturePage> with WidgetsBindingOb
                 ),
               ),
             ),
-            _BottomPanel(ui: ui, onShutter: controller.shutter, onRetry: controller.retry),
+            _BottomPanel(
+              ui: ui,
+              onShutter: controller.shutter,
+              onRetry: controller.retry,
+              onChoosePoint: _openPoint,
+              onOpenResult: _openResult,
+            ),
           ]),
         ),
       ),
@@ -78,11 +97,19 @@ class _CapturePageState extends ConsumerState<CapturePage> with WidgetsBindingOb
 }
 
 class _BottomPanel extends StatelessWidget {
-  const _BottomPanel({required this.ui, required this.onShutter, required this.onRetry});
+  const _BottomPanel({
+    required this.ui,
+    required this.onShutter,
+    required this.onRetry,
+    required this.onChoosePoint,
+    required this.onOpenResult,
+  });
 
   final CaptureUiState ui;
   final Future<void> Function() onShutter;
   final Future<void> Function() onRetry;
+  final VoidCallback onChoosePoint;
+  final VoidCallback onOpenResult;
 
   @override
   Widget build(BuildContext context) {
@@ -98,10 +125,15 @@ class _BottomPanel extends StatelessWidget {
           value: s.processTotal == 0 ? null : s.processDone / s.processTotal,
           label: Strings.processProgress(s.processDone, s.processTotal),
         ));
+      case CapturePhase.baselineCaptured:
+        children
+          ..add(const _Note(Strings.baselineCapturedHint))
+          ..add(FilledButton(onPressed: onChoosePoint, child: const Text(Strings.choosePoint)));
       case CapturePhase.result:
         children
           ..add(OutcomeSummary(outcome: s.outcome!, flags: s.flags))
           ..add(FilledButton(onPressed: onRetry, child: const Text(Strings.retry)));
+        if (s.outcome is VisitStored) children.add(TextButton(onPressed: onOpenResult, child: const Text(Strings.openResult)));
       case CapturePhase.error:
         children
           ..add(_Note(s.error ?? Strings.statusError))

@@ -90,3 +90,17 @@ Stream dan foto diam memakai satu preset (`ResolutionPreset.max`, DECISIONS D39)
 |---|---|---|
 | Foto hanya di penyimpanan privat | `adb shell run-as id.vassel.hairline ls files` memuat foto; galeri tidak menampilkannya | |
 | Sapuan berkas yatim saat start | Matikan paksa app tepat saat menyimpan, buka lagi: berkas tak terkait hilang | |
+
+## 10. Fase 7: lembar, titik ukur, layar (butuh ponsel dan printer)
+| Uji | Hasil yang diharapkan | Hasil |
+|---|---|---|
+| Cetak PDF A4 dan Letter di printer nyata, "100 persen" | Batang skala terukur 100 mm +- 1 mm dengan penggaris; sisi penanda 30 mm | |
+| Cetak dengan "fit to page" menyala | Batang skala meleset; pengguna memasukkan angka ukur sehingga `print_scale` mengoreksi (periksa tampilan skala di langkah 3) | |
+| Foto lembar cetak: penanda terdeteksi `hairline_opencv` | Semua id 4s sampai 4s+3 terdeteksi pada 12 lembar (hasil Python/OpenCV di host sudah ada: tools/verify_sheet_raster.py, bukan opencv_dart) | |
+| Garis putus-putus dan jendela | Jendela 70 x 70 mm bisa digunting rapi; celah putih 10 mm ke penanda | |
+| Printing: dialog cetak dan bagikan | Dialog sistem terbuka; berkas PDF terbagi | |
+| Orientasi foto di layar titik ukur | Foto tampil tegak sama dengan hasil dekode OpenCV (EXIF); overlay jendela menimpa jendela di foto. Bila foto tampil terputar, titik meleset: catat | |
+| Ketuk retak sungguhan | Titik menempel ke garis tengah retak; arah wajar; segmen 4 mm sejajar | |
+| Ketuk retak sangat samar | Pesan "Retak tidak ditemukan ...", tidak ada titik palsu | |
+| Dua kunjungan lanjutan dengan retak membesar | Tren menampilkan klasifikasi sesuai; label BELUM_DIVALIDASI tampil | |
+| Skala font sistem terbesar dan TalkBack | Tidak ada teks terpotong; pembaca layar membacakan label grafik dan gambar | |

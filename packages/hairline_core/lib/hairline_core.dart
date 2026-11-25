@@ -4,6 +4,7 @@
 /// The synthetic test harness lives in `package:hairline_core/synthetic.dart`.
 library;
 
+export 'src/aruco_bits.dart';
 export 'src/frame_pipeline.dart';
 export 'src/frame_ports.dart';
 export 'src/homography.dart';
@@ -20,6 +21,7 @@ export 'src/rejection.dart';
 export 'src/resource_scope.dart';
 export 'src/ridge.dart';
 export 'src/sheet.dart';
+export 'src/sheet_layout.dart';
 export 'src/special.dart';
 export 'src/stats.dart';
 export 'src/student_t.dart';

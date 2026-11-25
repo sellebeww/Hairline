@@ -205,4 +205,18 @@ void main() {
       expect(reduceCapture(ready, const RetryEvent()), same(ready));
     });
   });
+
+  group('baseline gate (point chosen afterwards)', () {
+    test('processing -> baselineCaptured keeps nothing but the flags; retry returns to waiting; wrong phase ignored', () {
+      var s = reduceCapture(const CaptureState(), const AnalysisEvent(null, Duration.zero));
+      expect(reduceCapture(s, const BaselineGatedEvent()), same(s), reason: 'not processing');
+      s = const CaptureState(phase: CapturePhase.processing, processTotal: 6, flags: ['fokus_tidak_terkunci']);
+      final done = reduceCapture(s, const BaselineGatedEvent());
+      expect(done.phase, CapturePhase.baselineCaptured);
+      expect(done.outcome, isNull);
+      expect(done.flags, ['fokus_tidak_terkunci']);
+      expect(done.canShoot, isFalse);
+      expect(reduceCapture(done, const RetryEvent()).phase, CapturePhase.waitingForMarkers);
+    });
+  });
 }
