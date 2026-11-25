@@ -2,6 +2,10 @@
 
 Longitudinal crack-width monitoring for non-professionals, Android first (Flutter). Owner and copyright holder: Vassel Goleyu. MIT license.
 
+> Status: MVP (`v0.1.0-mvp`). Everything is verified on synthetic data and on an Android emulator; **nothing is validated on a real phone yet**. See [Status](#status).
+
+**Contents:** [Honest statements](#honest-statements-read-first) · [The problem](#the-problem) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Synthetic study](#synthetic-study-label-sintetis) · [Making a sheet](#making-and-mounting-a-sheet) · [Plate validation](#running-the-plate-validation) · [Limits](#limits) · [Release build](#release-build) · [Status](#status) · [Documentation](#documentation)
+
 ## Honest statements (read first)
 
 - Results are INDICATIVE and do not replace inspection by a structural engineer. The app does not assess building safety and never shows the words "safe" or "harmless". If a crack appears to widen, lengthen, or a new crack appears, contact an engineer or the authorities.
@@ -10,6 +14,17 @@ Longitudinal crack-width monitoring for non-professionals, Android first (Flutte
 - Claims about literature and competitors in the original specification (a Witteveen+Bos app, a 5 mm camera-shift error, an add-on lens for 0.3 to 1 mm at 2 m) are reported, not verified. This README makes no comparison with any product.
 - Hairline does not accurately measure cracks that are not coplanar with the marker sheet, and is not suitable for regulatory decisions.
 - The checked-in `app/` has no marker detector wired in (the native OpenCV build cannot run on every host, BLOCKERS B1). A phone build must use `tools/build_device_apk.sh` (see [Release build](#release-build)); its detection has never run on a real camera. See [Status](#status).
+
+## Quick start
+
+```
+git clone https://github.com/sellebeww/Hairline.git && cd Hairline
+make verify                                   # core + adapter analysis + app tests (Flutter stable, Dart 3.13)
+cd app && flutter run -t lib/main_fake.dart   # whole flow on a simulated camera, no phone needed
+make apk-device                               # phone APK with OpenCV (needs cmake and ninja)
+```
+
+Repository layout: [Layout](#layout). Independent audit scripts: `make audit-docs`, `make audit-numeric`.
 
 ## The problem
 
@@ -136,6 +151,16 @@ Phase 9 independent audit (PASS/FAIL per item, with evidence): [docs/AUDIT.md](d
 - `packages/hairline_opencv`: OpenCV adapters (analyzed; native tests not run on the development host).
 - `app`: Flutter app (Riverpod, go_router, Drift, camera, pdf, printing).
 - `tools`: plate scan measurement (`measure_scan.dart`), phone APK build (`build_device_apk.sh`), audit scripts (`audit/`), spike and sheet checks. `docs`: progress, decisions, backlog, blockers, device test list.
+
+## Documentation
+
+| File | What |
+|---|---|
+| [docs/AUDIT.md](docs/AUDIT.md) | Phase 9 independent audit, PASS/FAIL per item with evidence |
+| [docs/DEVICE_TEST.md](docs/DEVICE_TEST.md) | Manual test list for a real phone (plate validation, two-week test) |
+| [docs/SYNTHETIC_VALIDATION.md](docs/SYNTHETIC_VALIDATION.md) | Full synthetic study (SINTETIS) |
+| [docs/MEASUREMENT_NOTES.md](docs/MEASUREMENT_NOTES.md) | Model, assumptions, sensitivity |
+| [docs/DECISIONS.md](docs/DECISIONS.md), [docs/BLOCKERS.md](docs/BLOCKERS.md), [docs/PROGRESS.md](docs/PROGRESS.md) | Decisions, open blockers, progress |
 
 ## License and ownership
 
